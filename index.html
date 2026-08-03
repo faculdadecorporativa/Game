@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Power of Feedback - Simultaneous Multiplayer</title>
+    
+    <!-- CDNs -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 🔥 SENIOR ARCHITECTURE: Enable Manual Dark Mode Toggle -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- PDF.js Library for AI Course Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+    <!-- EMAILJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script type="text/javascript">
+       (function(){
+          emailjs.init({ publicKey: "XY0DjHoAeZqWKqnoV" });
+       })();
+    </script>
+
+    <style>
+        /* Base & Animations */
+        .fade-in { animation: fadeIn 0.4s ease-in-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 3D Flip Cards */
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .flip-card-inner { transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); }
+        .flipped .flip-card-inner { transform: rotateY(180deg); }
+        .matched { opacity: 0.5; pointer-events: none; filter: grayscale(100%); }
+
+        /* General Utilities */
+        .correct-word { color: #4ade80; font-weight: bold; text-shadow: 0 0 8px rgba(74,222,128,0.4); }
+        .missed-word { color: #fb7185; text-decoration: line-through; font-weight: bold; }
+        .lifeline-btn:disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(100%); transform: none !important; box-shadow: none !important; }
+        #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; display: none; }
+
+        /* Loader */
+        .loader { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #6366f1; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto; box-shadow: 0 0 15px rgba(99,102,241,0.3); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Toasts */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+    </style>
+    
+    <!-- EXPERT CONFETTI CANNON -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        window.startConfetti = function() {
+            confetti({
+                particleCount: 150,
+                spread: 80,
+                origin: { y: 0.6 },
+                zIndex: 9999
+            });
+        };
+    </script>
+</head>
+
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white relative overflow-x-hidden pb-12 transition-colors duration-300">
+    
+    <!-- 🔥 FIXED: Tech glowing orbs hidden in Light Mode, visible in Dark Mode 🔥 -->
+    <div class="hidden dark:block fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
+    <div class="hidden dark:block fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
+
+    <!-- 🔥 FIREBASE INITIALIZATION 🔥 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
+        import { onValue } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCtJsPsEiEGUkRViHXvkMKzhaZZ9CCEDvk",
+            authDomain: "elearning-game-28b64.firebaseapp.com",
+            databaseURL: "https://elearning-game-28b64-default-rtdb.firebaseio.com",
+            projectId: "elearning-game-28b64",
+            storageBucket: "elearning-game-28b64.firebasestorage.app",
+            messagingSenderId: "831992039248",
+            appId: "1:831992039248:web:3916628af90e3df4964e55"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        window.firebaseDB = getDatabase(app);
+        window.firebaseRef = ref;
+        window.firebaseSet = set;
+        window.firebaseGet = get;
+        window.firebaseChild = child;
+        window.firebaseAuth = getAuth(app); 
+        window.firebaseSignIn = signInWithEmailAndPassword;
+        window.firebaseCreateUser = createUserWithEmailAndPassword;
+        window.firebaseReset = sendPasswordResetEmail;
+        window.firebaseSignOut = signOut;
+        window.firebaseOnValue = onValue;
+        
+        console.log("🔥 Firebase connected!");
+    </script>
+
+    <div id="toast-container"></div>
+
+    <div id="prof-cheer-container" class="fixed bottom-8 right-8 z-50 flex items-end gap-3 transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div class="bg-white dark:bg-slate-900/60 backdrop-blur-xl text-indigo-800 dark:text-indigo-300 border border-indigo-600 dark:border-indigo-500/30 px-5 py-3 rounded-2xl rounded-br-none shadow-2xl dark:shadow-[0_0_20px_rgba(99,102,241,0.2)] font-black text-lg" id="prof-cheer-text">Good job!</div>
+        <div class="w-16 h-16 rounded-full bg-indigo-100 dark:bg-slate-800/80 backdrop-blur-md border border-indigo-600 dark:border-indigo-500/50 flex items-center justify-center text-4xl shadow-xl dark:shadow-[0_0_15px_rgba(99,102,241,0.3)] transform scale-x-[-1]">👨‍🏫</div>
+    </div>
+
+    <div id="wait-overlay" class="fixed inset-0 bg-slate-900/90 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="text-center w-full max-w-lg mx-4">
+            <div class="bg-slate-800 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-2xl dark:rounded-3xl shadow-2xl dark:shadow-[0_0_40px_rgba(99,102,241,0.2)] border border-slate-700 dark:border-white/10">
+                <div class="loader mb-4 dark:mb-6"></div>
+                <h2 class="text-3xl font-bold animate-pulse text-indigo-400 mb-2 dark:mb-3 tracking-wide">Processing...</h2>
+                <p class="text-slate-300 dark:text-slate-400 font-medium">Validating answer data matrix</p>
+            </div>
+        </div>
+    </div>
+
+    <app-header class="relative z-20"></app-header>
+
+    <main class="max-w-6xl mx-auto px-4 py-8 relative z-10">
+        
+        <role-selection id="module-0"></role-selection>
+        <module-join-pin id="module-join-pin" class="hidden fade-in w-full block mt-20"></module-join-pin>
+        <prof-dashboard id="module-admin" class="hidden fade-in w-full block"></prof-dashboard>
+        <student-lobby id="module-waiting" class="hidden fade-in w-full block mt-20"></student-lobby>
+
+        <!-- 🔥 FIX: Ensure lifelines panel also uses the solid white trick in Light Mode -->
+        <div id="lifelines-panel" class="hidden max-w-3xl mx-auto mb-6 bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl border border-slate-200 dark:border-white/10 p-3 rounded-xl dark:rounded-2xl shadow-lg dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex justify-center space-x-2 sm:space-x-4 relative z-10 transition-colors duration-300">
+            <button onclick="window.lifelineManager.use('fiftyFifty')" id="ll-fiftyFifty" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-lg sm:text-xl font-black text-indigo-600 dark:text-white">50/50</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Half Off</span></button>
+            <button onclick="window.lifelineManager.use('askProf')" id="ll-askProf" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">👨‍🏫</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Ask Prof</span></button>
+            <button onclick="window.lifelineManager.use('google')" id="ll-google" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">🌐</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Database</span></button>
+            <button onclick="window.lifelineManager.use('callFriend')" id="ll-callFriend" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">📞</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Comm-Link</span></button>
+        </div>
+
+        <module-one id="module-1" class="hidden fade-in text-center max-w-4xl mx-auto"></module-one>
+        <module-two id="module-2" class="hidden fade-in text-center"></module-two>
+        <module-three id="module-3" class="hidden fade-in text-center max-w-4xl mx-auto"></module-three>
+        <module-four id="module-4" class="hidden fade-in text-center max-w-4xl mx-auto"></module-four>
+        <module-five id="module-5" class="hidden fade-in text-center max-w-2xl mx-auto"></module-five>
+        <module-six id="module-6" class="hidden fade-in text-center max-w-xl mx-auto"></module-six>
+        <module-seven id="module-7" class="hidden fade-in text-center max-w-3xl mx-auto"></module-seven>
+        <module-eight id="module-8" class="hidden fade-in text-center max-w-5xl mx-auto"></module-eight>
+        <module-nine id="module-9" class="hidden fade-in text-center max-w-3xl mx-auto"></module-nine>
+        <module-ten id="module-10" class="hidden fade-in text-center max-w-3xl mx-auto"></module-ten>
+        <module-eleven id="module-11" class="hidden fade-in text-center max-w-2xl mx-auto"></module-eleven>
+        <module-twelve id="module-12" class="hidden fade-in text-center"></module-twelve>
+    </main>
+
+    <app-modals id="modal-overlay" class="relative z-50"></app-modals>
+    <canvas id="confetti-canvas"></canvas>
+
+    <script type="module">
+        import { app } from './network.js';
+        import { defaultLessonData, cyberSecurityMockData } from './data.js';
+        import { authManager } from './auth.js';
+        import { authUI } from './authController.js';
+        import { appStore } from './store.js';
+        import { adminUI } from './AdminController.js';
+        import { uiManager } from './UIController.js';
+        import { game } from './GameController.js';
+        import { lifelineManager } from './LifelineController.js';
+        import { shopManager, aiSimulator, timerManager, imageManager } from './Utilities.js';
+        import { systemsCheck } from './SystemsCheck.js';
+
+        // UI COMPONENTS
+        import './AppHeader.js';
+        import './AppModals.js';
+        import './RoleSelection.js';
+        import './ModuleJoinPin.js'; 
+        import './ProfDashboard.js';
+        import './StudentLobby.js';
+        import './ModuleOne.js';
+        import './ModuleTwo.js';
+        import './ModuleThree.js'; 
+        import './ModuleFour.js'; 
+        import './ModuleFive.js'; 
+        import './ModuleSix.js';
+        import './ModuleSeven.js';
+        import './ModuleEight.js';
+        import './ModuleNine.js';
+        import './ModuleTen.js';
+        import './ModuleEleven.js';
+        import './ModuleTwelve.js';
+
+        window.lessonData = JSON.parse(JSON.stringify(defaultLessonData));
+        window.cyberSecurityMockData = cyberSecurityMockData;
+        window.appState = appStore.state; 
+
+        // Sound Effects & Utilities
+        window.sfx = {
+            play(type) {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(); osc.stop(ctx.currentTime + 0.1);
+                } catch(e) { }
+            }
+        };
+
+        window.toast = (msg, isSuccess) => {
+            const c = document.getElementById('toast-container'); const el = document.createElement('div');
+            el.className = `toast-enter max-w-[400px] w-full px-5 py-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] bg-white/60 dark:bg-slate-900/40 backdrop-blur-2xl font-semibold text-sm sm:text-base text-slate-800 dark:text-slate-100 border border-white/40 dark:border-white/10 ${isSuccess ? 'border-l-4 border-l-indigo-600 dark:border-l-indigo-500' : 'border-l-4 border-l-rose-500 dark:border-l-rose-500'} flex items-start gap-3 transition-colors duration-300`;
+            el.innerHTML = `<span class="text-xl mt-0.5 dark:drop-shadow-md">${isSuccess ? '💡' : '⚠️'}</span> <span class="leading-relaxed">${msg}</span>`; 
+            c.appendChild(el);
+            setTimeout(() => { el.classList.replace('toast-enter', 'toast-exit'); setTimeout(() => el.remove(), 400); }, 6000); 
+        };
+        
+        window.speakText = (text) => { if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); window.speechSynthesis.speak(u); } };
+        window.shuffleArray = (arr) => arr.sort(() => Math.random() - 0.5);
+
+        // Window Exposure
+        window.app = app;
+        window.appStore = appStore;
+        window.authManager = authManager;
+        window.authUI = authUI; 
+        window.adminUI = adminUI; 
+        window.timerManager = timerManager;
+        window.game = game;
+        window.lifelineManager = lifelineManager;
+        window.uiManager = uiManager;
+        window.shopManager = shopManager;
+        window.aiSimulator = aiSimulator;
+        window.imageManager = imageManager;
+
+        // Run Systems Check
+        if(typeof systemsCheck !== 'undefined' && systemsCheck.run) {
+            systemsCheck.run();
+        }
+    </script>
+    <script src="customAuthLogic.js"></script>
+</body>
+</html>
