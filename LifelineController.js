@@ -1,5 +1,5 @@
 // 🏗️ LifelineController.js
-// This file manages the game's lifeline logic (50/50, Ask Prof, Google, Call a Friend)
+// This file manages the game's lifeline logic (50/50, Ask Prof, Google, Call a Friend, Freeze Time, Time Burn)
 
 export const lifelineManager = {
     modalTimerInterval: null,
@@ -13,10 +13,55 @@ export const lifelineManager = {
     },
     
     use(type) {
-        const p = window.appState.me; 
+        // Use window.appStore to ensure safe data fetching
+        const p = window.appStore.get('me'); 
+        
+        // 🔥 NEW: Check if it's a store inventory item (Consumables) 🔥
+        if (['freezeTime', 'timeBurn'].includes(type)) {
+            if (!p.inventory || !p.inventory[type] || p.inventory[type] <= 0) {
+                window.toast("You don't own this item! Visit the store.", false);
+                return;
+            }
+            
+            // Consume item locally
+            p.inventory[type] -= 1;
+            window.appStore.set('me', p);
+
+            // Consume in Firebase
+            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
+                const userRef = window.firebaseRef(window.firebaseDB, `users/${p.uid}/inventory/${type}`);
+                window.firebaseSet(userRef, p.inventory[type]);
+            }
+
+            // Update UI Locker immediately
+            if (window.dashboardController) window.dashboardController.renderDashboard();
+
+            // Execute Active Effects
+            if (type === 'freezeTime') {
+                window.timerManager.pause();
+                window.toast("❄️ Time Frozen for 15 seconds!", true);
+                window.sfx.play('correct');
+                
+                setTimeout(() => {
+                    window.timerManager.resume();
+                    window.toast("⏱️ Time is moving again!", false);
+                }, 15000);
+            }
+            
+            if (type === 'timeBurn') {
+                const hostConn = window.appStore.get('hostConn');
+                if(hostConn) hostConn.send({ type: 'TIME_BURN', id: p.uid });
+                window.toast("🔥 Burned opponents' time!", true);
+                window.sfx.play('correct');
+            }
+            
+            return; // Exit early since it was an inventory item
+        }
+
+        // --- Original Classic Lifeline Logic ---
         if(!p.lifelines[type]) return; 
         p.lifelines[type] = false; 
-        this.renderButtons(window.appState.currentModule);
+        this.renderButtons(window.appStore.get('currentModule'));
         
         if(type === 'fiftyFifty') this.execute5050();
         if(type === 'askProf') this.showModal("Ask the Professor", "Ask your Professor for a hint!");

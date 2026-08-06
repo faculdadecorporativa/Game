@@ -2,13 +2,14 @@
 // This file handles the core game loop, scoring, and module logic using the appStore Vault.
 
 import { appStore } from './store.js';
+
 // 🏗️ ENTERPRISE CONFIG: This defines the order of your game modules.
-// To make a new game later, you just change this list!
 const GameConfig = [
     { type: 'study', getTarget: () => null }, // Module 1
     { type: 'dnd', getTarget: (idx) => window.lessonData.vocabulary[idx] }, // Module 2
     { type: 'hotspot', getTarget: (idx) => window.lessonData.hotspots[idx] }, // Module 3
-    { type: 'memory', getTarget: () => null }, // Module 4
+    // 🔥 FIX: Explicitly target the memoryMatch array directly from the synced lesson data!
+    { type: 'memory', getTarget: () => window.lessonData.memoryMatch }, // Module 4
     { type: 'audio', getTarget: (idx) => window.lessonData.audioGuess[idx] }, // Module 5
     { type: 'spelling', getTarget: (idx) => window.lessonData.spellingBee[idx] }, // Module 6
     { type: 'hangman', getTarget: (idx) => window.lessonData.hangman[idx] }, // Module 7
@@ -51,18 +52,17 @@ export const game = {
         appStore.set('currentModule', modNum);
         this.startTimer(60);
 
-        // 🚀 ENTERPRISE FACTORY: Automatically load based on the Config
-        const moduleConfig = GameConfig[modNum - 1]; // Arrays start at 0, so Module 1 is index 0
+        const moduleConfig = GameConfig[modNum - 1]; 
         
         if (moduleConfig) {
             const targetData = moduleConfig.getTarget(idx);
             
-            // Map the config type to the correct UI rendering function
             const componentActions = {
                 'study': () => { window.timerManager.stop(); window.uiManager.renderStudy(); },
                 'dnd': () => window.uiManager.renderDnD(targetData),
                 'hotspot': () => window.uiManager.renderHotspot(targetData),
-                'memory': () => this.initMemory(),
+                // 🔥 FIX: Pass the targeted data dynamically into the init engine
+                'memory': () => this.initMemory(targetData),
                 'audio': () => window.uiManager.renderAudio(targetData),
                 'spelling': () => window.uiManager.renderSpelling(targetData),
                 'hangman': () => this.initHangman(targetData),
@@ -72,7 +72,6 @@ export const game = {
                 'quiz': () => window.uiManager.renderQuiz(targetData)
             };
 
-            // Execute the action if it exists
             if (componentActions[moduleConfig.type]) {
                 componentActions[moduleConfig.type]();
             }
@@ -87,27 +86,103 @@ export const game = {
         window.timerManager.stop();
         let me = appStore.get('me');
         
-        if(points > 0) {
+        // 🚀 GAMIFICATION ENGINE: Safely initialize schema properties if new
+        me.xp = me.xp || 0;
+        me.coins = me.coins || 0;
+        me.streak = me.streak || 0;
+        if (!me.scores) me.scores = { total: 0, General: 0, Listening: 0, Speaking: 0, Writing: 0 };
+        if (typeof me.scores[skill] === 'undefined') me.scores[skill] = 0;
+
+        // 🔥 EXTRA LIFE CHECK 🔥
+        if (points < 0 && me.inventory && me.inventory.extraLife > 0) {
+            // Consume Extra Life locally
+            me.inventory.extraLife -= 1;
+            appStore.set('me', me);
+            
+            // Sync to Firebase directly
+            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
+                const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/extraLife`);
+                window.firebaseSet(userRef, me.inventory.extraLife);
+            }
+
+            // Prevent penalty
+            points = 0;
+            msg = "🛡️ Saved by Extra Life!";
+            window.toast(msg, true);
+            window.sfx.play('correct'); 
+            
+            // Re-render dashboard locker silently in background
+            if (window.dashboardController) window.dashboardController.renderDashboard();
+        } 
+        // 🚀 GAMIFICATION ENGINE: Rewards & Economy Calculation
+        else if(points > 0) {
             window.sfx.play('correct');
             me.streak++; 
-            if(window.timerManager.timeLeft >= 50) window.toast("Lightning Fast!", true);
-            if(me.streak === 2) window.toast("Two in a row!", true);
-            if(me.streak >= 3) window.toast("Unstoppable!", true);
+            
+            // Base Economy Math
+            let earnedXP = points * 10;
+            let earnedCoins = points * 5;
+
+            // Engagement / Streak Multipliers
+            if(window.timerManager.timeLeft >= 50) {
+                window.toast("Lightning Fast! +15 XP", true);
+                earnedXP += 15;
+            }
+            if(me.streak === 2) {
+                window.toast("Two in a row! 🔥", true);
+                earnedXP += 20;
+            }
+            if(me.streak >= 3) {
+                window.toast(`Unstoppable! ${me.streak} Streak! 🪙`, true);
+                earnedXP += 50;
+                earnedCoins += 10; // Bonus economy for high engagement
+            }
+
+            // 🔥 DOUBLE COINS LOGIC 🔥
+            if (me.inventory && me.inventory.doubleCoins > 0) {
+                // Apply the multiplier and decrement the item
+                earnedCoins *= 2;
+                me.inventory.doubleCoins -= 1;
+                window.toast("🪙 Double Coins Active! Earnings Multiplied!", true);
+                
+                // Sync doubleCoins inventory decrement directly to Firebase
+                if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
+                    const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/doubleCoins`);
+                    window.firebaseSet(userRef, me.inventory.doubleCoins);
+                }
+                
+                // Refresh dashboard to visually update the inventory locker count
+                if (window.dashboardController) window.dashboardController.renderDashboard();
+            }
+
+            // Award to profile
+            me.xp += earnedXP;
+            me.coins += earnedCoins;
             window.uiManager.showProfChat();
         } else {
             window.sfx.play('wrong');
-            me.streak = 0;
+            me.streak = 0; // Break streak
         }
         
+        // Granular Performance Tracking
         me.scores.total += points; 
         me.scores[skill] += points; 
         appStore.set('me', me);
+        
+        // 🚀 GAMIFICATION ENGINE: Persist Everything to Firebase
+        if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
+            const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}`);
+            // Pushing the whole 'me' object securely updates scores, streak, xp, and coins in one go!
+            window.firebaseSet(userRef, me);
+        }
+
         window.uiManager.updateStudentHUD();
 
         const hostConn = appStore.get('hostConn');
         if(hostConn) hostConn.send({ type: 'SCORE_UPDATE', id: appStore.get('peer').id, points, skill });
-        window.toast(msg + ` (${points > 0 ? '+'+points : points} pts)`, points > 0); window.uiManager.lockModule();
-        // NEW: Auto-advance to the next module after 2 seconds
+        window.toast(msg + ` (${points > 0 ? '+'+points : points} pts)`, points > 0 || msg.includes("Extra Life")); 
+        window.uiManager.lockModule();
+        
         setTimeout(() => {
             let currentMod = appStore.get('currentModule');
             if (currentMod < 11) {
@@ -116,21 +191,59 @@ export const game = {
         }, 2000);
     },
 
-    // Action Handlers
     handleDnDMatch(isMatch) { if(isMatch) this.submitScore(3, "General", "Matched!"); else this.submitScore(-1, "General", "Missed!"); },
     handleHotspot(isHit) { if(isHit) this.submitScore(3, "General", "Found it!"); else this.submitScore(-1, "General", "Missed!"); },
     
-    initMemory() {
-        let cards = []; window.lessonData.vocabulary.forEach((v) => { cards.push({ id: v.term, type: 'term', content: v.term }); cards.push({ id: v.term, type: 'pair', content: v.matchImg || v.def, isImg: !!v.matchImg }); });
+    // 🔥 ENGINE UPGRADE: Injects the synced data directly, bypassing local null states 🔥
+    initMemory(targetData) {
+        let cards = []; 
+        let memData = targetData || window.lessonData?.memoryMatch || [];
+        const memType = window.lessonData?.memoryMatchType || 'text-text';
+
+        // 🔥 CRITICAL FIX: If Professor data didn't sync correctly to the student, force fallback data so the screen is never blank!
+        if (!memData || memData.length === 0) {
+            console.warn("Memory Match data missing or empty! Loading default fallbacks to prevent crash.");
+            memData = [
+                { term: "Connection", match: "Link" },
+                { term: "Database", match: "Storage" },
+                { term: "Server", match: "Host" },
+                { term: "Client", match: "User" }
+            ];
+        }
+
+        memData.forEach((v, idx) => { 
+            let termContent = v.term || "?";
+            let matchContent = v.match || "?";
+
+            // Dynamically build image tags based on the selected mode with graceful fallbacks
+            if (memType === 'image-text') {
+                termContent = v.termImg ? `<img src="${v.termImg}" alt="Card Image" class="w-full h-full object-cover rounded-lg">` : (v.term || "No Image");
+                matchContent = v.match || "No Text";
+            } else if (memType === 'image-image') {
+                termContent = v.termImg ? `<img src="${v.termImg}" alt="Card Image 1" class="w-full h-full object-cover rounded-lg">` : (v.term || "No Image");
+                matchContent = v.matchImg ? `<img src="${v.matchImg}" alt="Card Image 2" class="w-full h-full object-cover rounded-lg">` : (v.match || "No Image");
+            }
+
+            cards.push({ id: idx, type: 'term', content: termContent }); 
+            cards.push({ id: idx, type: 'pair', content: matchContent }); 
+        });
         
-        let localGameData = appStore.get('localGameData');
+        let localGameData = appStore.get('localGameData') || {};
+        
         localGameData.memCards = shuffleArray(cards); 
         localGameData.memFlipped = []; 
         localGameData.memMatched = 0; 
-        localGameData.memTotal = window.lessonData.vocabulary.length;
+        localGameData.memTotal = memData.length;
         
         appStore.set('localGameData', localGameData);
-        window.uiManager.renderMemoryGrid(localGameData.memCards); 
+        
+        // Slight delay ensures the DOM is un-hidden before rendering the cards
+        setTimeout(() => {
+            if(window.uiManager && typeof window.uiManager.renderMemoryGrid === 'function') {
+                window.uiManager.renderMemoryGrid(localGameData.memCards); 
+            }
+        }, 100);
+        
         window.timerManager.start();
     },
     
@@ -147,15 +260,14 @@ export const game = {
             if (d.memCards[idx1].id === d.memCards[idx2].id) {
                 d.memMatched++;
                 if(appStore.get('role') !== 'host') {
-                    let me = appStore.get('me');
-                    me.scores.total += 3; me.scores.General += 3; appStore.set('me', me);
-                    window.uiManager.updateStudentHUD(); window.sfx.play('correct');
-                    
-                    const hostConn = appStore.get('hostConn');
-                    if(hostConn) hostConn.send({ type: 'SCORE_UPDATE', id: appStore.get('peer').id, points: 3, skill: "General" });
-                    window.uiManager.showProfChat();
+                    // Force the score via submitScore to trigger economy logic
+                    this.submitScore(3, "General", "Memory Match!");
+                    window.uiManager.markMemoryMatched(idx1, idx2);
+                } else {
+                    window.uiManager.markMemoryMatched(idx1, idx2);
                 }
-                window.uiManager.markMemoryMatched(idx1, idx2); d.memFlipped = []; 
+                
+                d.memFlipped = []; 
                 appStore.set('localGameData', d);
                 
                 if (d.memMatched === d.memTotal) { 
@@ -164,22 +276,16 @@ export const game = {
                         window.timerManager.stop(); 
                         window.toast("Memory Cleared!", true); 
                         
-                        // NEW: Auto-advance from Module 4 to Module 5
                         setTimeout(() => {
                             window.game.startModule(5, 0);
                         }, 2000);
                     }
                     else { window.toast("Host test: Memory Cleared!", true); }
                 }
-                else if (appStore.get('role') !== 'host') window.toast("Match! +3 Pts.", true);
             } else {
                 if(appStore.get('role') !== 'host') {
-                    window.timerManager.pause(); window.toast("Missed! -1 Pt.", false); window.sfx.play('wrong');
-                    let me = appStore.get('me');
-                    me.scores.total -= 1; me.scores.General -= 1; appStore.set('me', me);
-                    window.uiManager.updateStudentHUD();
-                    const hostConn = appStore.get('hostConn');
-                    if(hostConn) hostConn.send({ type: 'SCORE_UPDATE', id: appStore.get('peer').id, points: -1, skill: "General" });
+                    window.timerManager.pause(); 
+                    this.submitScore(-1, "General", "Memory Miss!");
                 }
                 setTimeout(() => { 
                     window.uiManager.unflipMemoryCard(idx1); 

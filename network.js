@@ -61,6 +61,14 @@ export const app = {
         if(window.adminUI && window.adminUI.saveContent) window.adminUI.saveContent();
         
         const pin = appStore.get('roomCode');
+        
+        // 🔥 CRITICAL FIX: Push the Professor's custom lesson data to the live room 🔥
+        if (window.lessonData && Object.keys(window.lessonData).length > 0) {
+            const dataRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/lessonData`);
+            await window.firebaseSet(dataRef, window.lessonData);
+            console.log("📡 Broadcasted custom lesson data to room!");
+        }
+
         const gameStateRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/gameState`);
         
         // 1. Broadcast "countdown" state
@@ -213,6 +221,17 @@ export const app = {
     listenToRoom(pin) {
         const studentsRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students`);
         const gameStateRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/gameState`);
+        const dataRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/lessonData`); // 🔥 NEW OBSERVER
+
+        // 🔥 NEW: Student listens for custom data payload beamed from host
+        if (appStore.get('role') === 'student') {
+            window.firebaseOnValue(dataRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    window.lessonData = snapshot.val();
+                    console.log("📥 Custom lesson data downloaded from host!");
+                }
+            });
+        }
 
         window.firebaseOnValue(studentsRef, (snapshot) => {
             const data = snapshot.val() || {};

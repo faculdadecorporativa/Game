@@ -1,4 +1,5 @@
-// 🏗️ authController.js - Strict Gatekeeper Version with Canvas Compression
+// authController.js
+// Strict Gatekeeper Version with Canvas Compression
 
 export const authUI = {
     isProfRegistering: false,
@@ -11,7 +12,7 @@ export const authUI = {
             input.type = input.type === 'password' ? 'text' : 'password';
         }
     },
-// 🚀 Dynamically load professors from Firebase into the dropdown
+    
     async loadProfessorsDropdown() {
         const selectEl = document.getElementById('professor-select');
         if (!selectEl) return;
@@ -19,26 +20,31 @@ export const authUI = {
         selectEl.innerHTML = '<option value="" disabled selected>Select a Professor...</option>';
 
         try {
-            const dbRef = window.firebaseDatabase.ref('users');
-            const snapshot = await dbRef.orderByChild('role').equalTo('professor').once('value');
-            
-            if (snapshot.exists()) {
-                snapshot.forEach((childSnapshot) => {
-                    const prof = childSnapshot.val();
-                    const profUid = childSnapshot.key;
-                    const profName = prof.name || prof.email || "Unnamed Professor";
-
-                    const option = document.createElement('option');
-                    option.value = profUid;
-                    option.textContent = profName;
-                    selectEl.appendChild(option);
-                });
+            if (window.firebaseRef && window.firebaseGet && window.firebaseDB) {
+                const profRef = window.firebaseRef(window.firebaseDB, 'professorsList');
+                const snapshot = await window.firebaseGet(profRef);
+                
+                if (snapshot.exists()) {
+                    const professors = snapshot.val();
+                    for (let key in professors) {
+                        const prof = professors[key];
+                        const option = document.createElement('option');
+                        option.value = prof.uid || key;
+                        option.textContent = prof.name || prof.email || key;
+                        selectEl.appendChild(option);
+                    }
+                } else {
+                    selectEl.innerHTML += '<option value="" disabled>No professors registered.</option>';
+                }
+            } else {
+                console.warn("Firebase references not fully loaded for professor list.");
             }
         } catch (error) {
             console.error("Error loading professors:", error);
+            selectEl.innerHTML += '<option value="" disabled>Error loading list.</option>';
         }
     },
-    // --- MENTOR FIX: Advanced Canvas Image Compressor for Student Registration ---
+
     compressImageToSquare(file, callback) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -67,9 +73,8 @@ export const authUI = {
         const f = e.target.files[0];
         if (f) {
             this.compressImageToSquare(f, (compressedData) => {
-                this.tempAvatar = compressedData; // Store compressed image in memory
+                this.tempAvatar = compressedData; 
                 
-                // Update the visual preview circle in the modal
                 const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
                 previewImgs.forEach(img => {
                     if(img) img.src = compressedData;
@@ -78,7 +83,6 @@ export const authUI = {
         }
     },
 
-    // --- Professor UI ---
     showProfLogin() { 
         this.isProfRegistering = false;
         this.updateProfAuthUI();
@@ -96,6 +100,9 @@ export const authUI = {
         document.getElementById('p-auth-btn').innerText = this.isProfRegistering ? "Register & Request Approval" : "Login";
         document.getElementById('p-toggle-btn').innerText = this.isProfRegistering ? "Already approved? Login here" : "Need an account? Register";
         document.getElementById('p-register-fields').classList.toggle('hidden', !this.isProfRegistering);
+        
+        const forgotBtn = document.getElementById('p-forgot-pass-container');
+        if (forgotBtn) forgotBtn.classList.toggle('hidden', this.isProfRegistering);
     },
     
     async submitProfAuth() {
@@ -113,6 +120,10 @@ export const authUI = {
                 await window.authManager.loginProfessor(inputEmail, inputPass);
                 if(window.toast) window.toast("Professor authenticated securely.", true);
                 
+                if (window.databaseJanitor) {
+                    window.databaseJanitor.runCleanup();
+                }
+                
                 if (window.uiManager) window.uiManager.closeModals(); 
                 const mod0 = document.getElementById('module-0');
                 if (mod0) mod0.classList.add('hidden'); 
@@ -126,14 +137,38 @@ export const authUI = {
         }
     },
 
-    // --- Student UI ---
+    async resetProfPassword() {
+        const email = document.getElementById('prof-email')?.value.trim();
+        
+        if (!email) {
+            if(window.toast) window.toast("Please enter your email address in the top box first to reset your password.", false);
+            if(window.sfx) window.sfx.play('wrong');
+            return;
+        }
+
+        try {
+            if (window.firebaseReset && window.firebaseAuth) {
+                await window.firebaseReset(window.firebaseAuth, email);
+                if(window.toast) window.toast("Password reset email sent! Check your inbox.", true);
+                if(window.sfx) window.sfx.play('correct');
+            } else {
+                console.error("Firebase auth/reset methods not bound to window.");
+            }
+        } catch (error) {
+            let errorMsg = "Failed to send reset email.";
+            if (error.code === 'auth/user-not-found') errorMsg = "No account found with this email.";
+            if (error.code === 'auth/invalid-email') errorMsg = "Invalid email format.";
+            if(window.toast) window.toast(errorMsg, false);
+            if(window.sfx) window.sfx.play('wrong');
+        }
+    },
+
     showStudentAuth() { 
         this.isRegistering = false; 
         this.updateAuthUI(); 
         if(window.uiManager) window.uiManager.closeModals(); 
         document.getElementById('modal-student-auth').classList.remove('hidden'); 
         
-        // 🚀 Load the dynamic professors list instantly
         this.loadProfessorsDropdown();
     },
     
@@ -157,7 +192,6 @@ export const authUI = {
         const nameEl = document.getElementById('s-name');
         const name = nameEl ? nameEl.value.trim() : '';
         
-        // 🚀 NEW: Grab the professor selection
         const profSelect = document.getElementById('professor-select');
         const profId = profSelect ? profSelect.value : null;
         
@@ -167,21 +201,22 @@ export const authUI = {
             if (phone.length < 6) throw new Error("Please enter a valid Phone Number.");
 
             if (this.isRegistering) {
-                // 🚀 NEW: Validate professor selection
                 if (!profId) throw new Error("Please select a Professor.");
                 
-                // 🚀 NEW: Pass profId to authManager
                 await window.authManager.registerStudent(cc, phone, pass, name, this.tempAvatar, profId);
                 
-                // 🚀 NEW: Alert user and stop them from proceeding to game
                 if(window.toast) window.toast(`Account registered! Waiting for professor approval.`, true);
                 
                 if (window.uiManager) window.uiManager.closeModals();
-                return; // 🛑 Stops the code here so they don't enter the game unapproved
+                return; 
                 
             } else {
-                await window.authManager.loginStudent(cc, phone, pass);
+                await window.authManager.loginStudent(cc, phone, pass, profId);
                 if(window.toast) window.toast("Login successful!", true);
+                
+                if (window.firebaseAuth && window.firebaseAuth.currentUser && window.syncManager) {
+                    window.syncManager.startMirroring(window.firebaseAuth.currentUser.uid);
+                }
             }
 
             if (window.sfx && window.sfx.play) window.sfx.play('alert');
@@ -207,24 +242,19 @@ export const authUI = {
     }
 };
 
-// ==========================================
-// 🚀 NEW: ENTER KEY SUBMISSION
-// ==========================================
 document.addEventListener("DOMContentLoaded", () => {
-    // Reusable function that triggers a specific authUI method when Enter is pressed
     const enableEnter = (inputId, actionMethod) => {
         const input = document.getElementById(inputId);
         if (input) {
             input.addEventListener("keydown", (e) => {
                 if (e.key === "Enter") {
                     e.preventDefault();
-                    authUI[actionMethod](); // Calls authUI.submitProfAuth() or authUI.submitStudentAuth()
+                    authUI[actionMethod]();
                 }
             });
         }
     };
 
-    // Attach listeners to your exact input IDs
     enableEnter("prof-email", "submitProfAuth");
     enableEnter("prof-pass", "submitProfAuth");
     enableEnter("s-phone", "submitStudentAuth");

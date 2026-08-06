@@ -1,5 +1,5 @@
-// 🏗️ AdminController.js
-// This file handles all the pure business logic for the Professor Dashboard.
+// AdminController.js
+// Tenant-Isolated Business Logic
 
 import { tailwindColors, animalThemes } from './data.js';
 import { authManager } from './auth.js';
@@ -8,13 +8,81 @@ import { appStore } from './store.js';
 export const adminUI = {
     chartInstance: null, demoChartInstance: null,
     
-    init() { 
+    async init() { 
+        try {
+            const dbLessonData = await authManager.getDB('lessonData');
+            if (dbLessonData && Object.keys(dbLessonData).length > 0) {
+                window.lessonData = dbLessonData;
+            } else {
+                const savedData = localStorage.getItem('profLessonData');
+                if (savedData) window.lessonData = JSON.parse(savedData);
+            }
+        } catch (e) {
+            console.error("Failed to load lesson data", e);
+        }
+
         this.renderContentEditors(); 
         this.setupDrawingBoard('mod3-draw-container'); 
         this.setupDrawingBoard('mod8-draw-container'); 
         this.renderTeams(); 
         this.renderStudentManagement(); 
         this.updateLobbyList();
+    },
+
+    deleteItem(type, index) {
+        if (!window.lessonData) return;
+        
+        if (type === 'memoryMatch' && window.lessonData.memoryMatch) window.lessonData.memoryMatch.splice(index, 1);
+        if (type === 'chatPhrase' && window.lessonData.chatPhrases) window.lessonData.chatPhrases.splice(index, 1);
+        if (type === 'vocab' && window.lessonData.vocabulary) window.lessonData.vocabulary.splice(index, 1);
+        if (type === 'audioGuess' && window.lessonData.audioGuess) window.lessonData.audioGuess.splice(index, 1);
+        if (type === 'spellingBee' && window.lessonData.spellingBee) window.lessonData.spellingBee.splice(index, 1);
+        if (type === 'hangman' && window.lessonData.hangman) window.lessonData.hangman.splice(index, 1);
+        if (type === 'readAloud' && window.lessonData.readAloud) window.lessonData.readAloud.splice(index, 1);
+        if (type === 'dictation' && window.lessonData.dictation) window.lessonData.dictation.splice(index, 1);
+        if (type === 'quiz' && window.lessonData.quiz) window.lessonData.quiz.splice(index, 1);
+        if (type === 'hotspot' && window.lessonData.hotspots) window.lessonData.hotspots.splice(index, 1);
+        if (type === 'wally' && window.lessonData.wally) window.lessonData.wally.splice(index, 1);
+        
+        this.renderContentEditors();
+    },
+
+    exitToLobby() {
+        const gameContainer = document.getElementById('game-container'); 
+        if (gameContainer) gameContainer.classList.add('hidden');
+        
+        for(let i = 1; i <= 11; i++) {
+            const mod = document.getElementById(`module-${i}`);
+            if(mod) mod.classList.add('hidden');
+        }
+
+        const profDashboard = document.querySelector('prof-dashboard');
+        if (profDashboard) profDashboard.classList.remove('hidden');
+
+        this.switchTab('lobby');
+        appStore.set('isLiveViewOpen', false);
+    },
+
+    async restartSession() {
+        if(!confirm("Are you sure you want to clear all student data and restart the session?")) return;
+        
+        appStore.set('players', {});
+        appStore.set('currentModule', 0);
+        
+        const pin = appStore.get('roomCode');
+        if (pin && window.firebaseRef && window.firebaseSet) {
+            const roomRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students`);
+            await window.firebaseSet(roomRef, null);
+        }
+        
+        const currentModText = document.getElementById('prof-current-module');
+        if(currentModText) currentModText.innerText = "Ready to Start";
+        
+        this.updateLobbyList();
+        this.updateTeamScores();
+        this.exitToLobby();
+        
+        window.toast("Session wiped. Ready for a new class!", true);
     },
     
     switchTab(tab) {
@@ -42,16 +110,14 @@ export const adminUI = {
         }
     },
 
-    // MENTOR FIX: Advanced Canvas Image Compressor (Square crop + JPEG shrink)
     compressImageToSquare(file, callback) {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_SIZE = 150; // Tiny size to save database load
+                const MAX_SIZE = 150; 
                 
-                // Calculate square crop from center
                 const size = Math.min(img.width, img.height);
                 const startX = (img.width - size) / 2;
                 const startY = (img.height - size) / 2;
@@ -60,10 +126,7 @@ export const adminUI = {
                 canvas.height = MAX_SIZE;
                 const ctx = canvas.getContext('2d');
                 
-                // Draw cropped image onto canvas
                 ctx.drawImage(img, startX, startY, size, size, 0, 0, MAX_SIZE, MAX_SIZE);
-                
-                // Compress to 80% JPEG
                 callback(canvas.toDataURL('image/jpeg', 0.8));
             };
             img.src = e.target.result;
@@ -97,6 +160,19 @@ export const adminUI = {
         }
     },
 
+    handleMemUpload(e, imgId, idx, key) {
+        const f = e.target.files[0];
+        if(f) {
+            this.compressImageToSquare(f, (compressedData) => {
+                const img = document.getElementById(imgId);
+                if(img) img.src = compressedData;
+                if(!window.lessonData.memoryMatch) window.lessonData.memoryMatch = [];
+                if(!window.lessonData.memoryMatch[idx]) window.lessonData.memoryMatch[idx] = {term:"", match:"", termImg:"", matchImg:""};
+                window.lessonData.memoryMatch[idx][key] = compressedData;
+            });
+        }
+    },
+
     updateStudentAvatar(e, phone) { 
         const f = e.target.files[0]; 
         if(f) { 
@@ -111,38 +187,62 @@ export const adminUI = {
     },
     
     async changeProfCredentials() {
-        const newUsernameInput = document.getElementById('new-prof-user');
-        const newPasswordInput = document.getElementById('new-prof-pass');
-        
-        const newEmail = newUsernameInput ? newUsernameInput.value.trim() : '';
-        const newPass = newPasswordInput ? newPasswordInput.value.trim() : '';
+        const currEmail = document.getElementById('current-prof-email')?.value.trim();
+        const currPass = document.getElementById('current-prof-pass')?.value.trim();
+        const newUsernameInput = document.getElementById('new-prof-user')?.value.trim();
+        const newEmail = document.getElementById('new-prof-email')?.value.trim();
+        const newPass = document.getElementById('new-prof-pass')?.value.trim();
+        const avatarEl = document.getElementById('new-prof-avatar-preview');
+        const newAvatar = avatarEl ? avatarEl.dataset.newavatar : null;
 
-        if (!newEmail && !newPass) {
-            return window.toast("Please enter a new username or password.", false);
-        }
+        if (!currEmail || !currPass) return window.toast("Current Email and Password are required to make changes.", false);
 
         try {
             const user = window.firebaseAuth.currentUser;
             if (!user) throw new Error("No professor is currently logged in.");
 
-            // Use modular Firebase Auth functions stored on window or imported
-            if (newEmail && window.updateEmail) {
-                await window.updateEmail(user, newEmail);
-            }
-            if (newPass && window.updatePassword) {
-                if (newPass.length < 6) throw new Error("Password must be at least 6 characters.");
-                await window.updatePassword(user, newPass);
-            }
+            import("https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js").then(async ({ EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword }) => {
+                
+                try {
+                    const credential = EmailAuthProvider.credential(currEmail, currPass);
+                    await reauthenticateWithCredential(user, credential);
+                } catch(e) {
+                    throw new Error("Invalid current email or password.");
+                }
 
-            const nameEl = document.getElementById('prof-hud-name');
-            if (nameEl && newEmail) nameEl.innerText = newEmail;
+                if (newAvatar) localStorage.setItem('profAvatar', newAvatar);
+                
+                if (newEmail) await updateEmail(user, newEmail);
+                if (newPass) {
+                    if (newPass.length < 6) throw new Error("Password must be at least 6 characters.");
+                    await updatePassword(user, newPass);
+                }
+                
+                const finalEmail = newEmail || currEmail;
+                const uid = appStore.get('currentProfId') || user.uid;
+                const finalName = newUsernameInput || appStore.get('profName') || finalEmail.split('@')[0];
+                
+                await window.firebaseSet(window.firebaseRef(window.firebaseDB, `professorsList/${uid}`), { 
+                    email: finalEmail, 
+                    name: finalName,
+                    status: 'approved' 
+                });
 
-            window.toast("Professor profile updated successfully!", true);
-            if (newUsernameInput) newUsernameInput.value = '';
-            if (newPasswordInput) newPasswordInput.value = '';
+                appStore.set('profName', finalName);
+                if (window.uiManager) window.uiManager.updateProfHUD();
 
+                window.toast("Credentials updated successfully!", true);
+                
+                document.getElementById('current-prof-email').value = '';
+                document.getElementById('current-prof-pass').value = '';
+                document.getElementById('new-prof-user').value = '';
+                document.getElementById('new-prof-email').value = '';
+                document.getElementById('new-prof-pass').value = '';
+
+            }).catch(err => {
+                window.toast(`Update failed: ${err.message}`, false);
+            });
         } catch (error) {
-            console.error("Credential update error:", error);
             window.toast(`Update failed: ${error.message}`, false);
         }
     },
@@ -150,39 +250,33 @@ export const adminUI = {
     renderTeams() {
         const list = document.getElementById('admin-team-list');
         const manualTeamSelect = document.getElementById('manual-student-team');
-        const teams = appStore.get('teams');
+        const teams = appStore.get('teams') || [];
         
-        // Update the main team management list
         if(list) {
-            list.innerHTML = teams.map((t, i) => {
-                const theme = animalThemes[t.id];
-                return `
-                <div class="flex justify-between items-center bg-white p-2 border rounded">
+            list.innerHTML = teams.map((t, i) => `
+                <div class="flex justify-between items-center bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-white/10 rounded">
                     <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded-full ${tailwindColors[theme.color].bg}"></div>
-                        <span class="font-bold">${theme.icon} ${theme.name}</span>
+                        <div class="w-4 h-4 rounded-full ${tailwindColors[animalThemes[t.id].color].bg}"></div>
+                        <span class="font-bold text-slate-800 dark:text-white">${animalThemes[t.id].name}</span>
                     </div>
-                    <button onclick="adminUI.deleteTeam(${i})" class="text-red-500 hover:bg-red-50 px-2 rounded font-bold">✕</button>
-                </div>`;
-            }).join('');
+                    <button onclick="adminUI.deleteTeam(${i})" class="text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 px-2 rounded font-bold">X</button>
+                </div>`).join('');
         }
 
-        // MENTOR FIX: Sync the Add Student Manually dropdown with active teams
         if(manualTeamSelect) {
-            manualTeamSelect.innerHTML = `<option value="random">🎲 Random Team</option>` + 
-                teams.map(t => `<option value="${t.id}">${animalThemes[t.id].icon} ${animalThemes[t.id].name}</option>`).join('');
+            manualTeamSelect.innerHTML = `<option value="random">Random Team</option>` + 
+                teams.map(t => `<option value="${t.id}">${animalThemes[t.id].name}</option>`).join('');
         }
-
         this.updateTeamScores(); 
     },
     
     addTeam() {
         const animalId = document.getElementById('new-team-animal').value;
-        const teams = appStore.get('teams');
+        const teams = appStore.get('teams') || [];
         if(!teams.find(t => t.id === animalId)) {
             const updatedTeams = [...teams, {id: animalId}];
             appStore.set('teams', updatedTeams);
-            localStorage.setItem('gameTeams', JSON.stringify(updatedTeams));
+            authManager.saveDB(updatedTeams, 'teams');
             this.renderTeams(); this.renderStudentManagement();
         } else {
             window.toast("Team already exists!", false);
@@ -190,11 +284,11 @@ export const adminUI = {
     },
     
     deleteTeam(index) {
-        const teams = appStore.get('teams');
+        const teams = appStore.get('teams') || [];
         if(teams.length <= 1) return window.toast("You must have at least one team.", false);
         const updatedTeams = teams.filter((_, i) => i !== index);
         appStore.set('teams', updatedTeams);
-        localStorage.setItem('gameTeams', JSON.stringify(updatedTeams));
+        authManager.saveDB(updatedTeams, 'teams');
         this.renderTeams(); this.renderStudentManagement();
     },
 
@@ -205,38 +299,29 @@ export const adminUI = {
         const cleanPhone = String(rawPhone).replace(/\D/g, '');
         const pass = document.getElementById('manual-student-pass').value.trim();
         const selectedTeam = document.getElementById('manual-student-team').value;
-        
         const avatarEl = document.getElementById('manual-student-avatar-preview');
         let avatar = avatarEl ? avatarEl.dataset.newavatar : null;
 
         if (!name || !cleanPhone || !pass) return window.toast("Name, Phone, and Password are required.", false);
-        if (!/^\d{8,15}$/.test(cleanPhone)) return window.toast("Please enter a valid numeric phone number (8-15 digits).", false);
+        if (!/^\d{8,15}$/.test(cleanPhone)) return window.toast("Please enter a valid numeric phone number.", false);
         
         const phone = cc + cleanPhone;
-        const shadowEmail = `${phone}@student.app.com`;
-        const teams = appStore.get('teams');
+        const shadowEmail = `${phone}_${Date.now()}@student.app.com`;
+        const teams = appStore.get('teams') || [{id: 'eagle'}];
+        const finalTeam = selectedTeam === 'random' ? teams[0].id : selectedTeam;
+        if (!avatar) avatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
         
-        // Handle explicit team choice or random assignment
-        const finalTeam = selectedTeam === 'random' 
-            ? teams[Math.floor(Math.random() * teams.length)].id 
-            : selectedTeam;
-        
-        if (!avatar) {
-            avatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-        }
-
         try {
             import("https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js").then(async ({ initializeApp }) => {
                 import("https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js").then(async ({ getAuth, createUserWithEmailAndPassword, signOut }) => {
-                    
                     const adminApp = initializeApp(window.firebaseDB.app.options, "AdminAppInstance");
                     const adminAuth = getAuth(adminApp);
                     
                     const userCredential = await createUserWithEmailAndPassword(adminAuth, shadowEmail, pass);
                     await signOut(adminAuth);
 
-                    const studentData = { uid: userCredential.user.uid, name: name, avatar, team: finalTeam }; 
-                    await authManager.saveDB(studentData, `feedbackStudentsDb/${phone}`);
+                    const studentData = { uid: userCredential.user.uid, name: name, avatar, team: finalTeam, shadowEmail, status: 'approved' }; 
+                    await authManager.saveDB(studentData, `students/${phone}`);
 
                     window.toast(`Successfully registered ${name}!`, true);
                     
@@ -252,55 +337,123 @@ export const adminUI = {
                     this.renderStudentManagement();
                 });
             });
-            
-        } catch (error) {
-            window.toast(`Registration failed: ${error.message}`, false);
-        }
+        } catch (error) { window.toast(`Registration failed: ${error.message}`, false); }
     },
 
     renderStudentManagement() {
-        const db = authManager.getDB('feedbackStudentsDb'); 
+        const dbPromise = authManager.getDB('students'); 
+        const pendingContainer = document.getElementById('pending-approvals-list');
         const container = document.getElementById('student-management-list'); 
-        container.innerHTML = '';
         
-        db.then(database => {
-            const teams = appStore.get('teams');
+        dbPromise.then(database => {
+            if(pendingContainer) pendingContainer.innerHTML = '';
+            if(container) container.innerHTML = '';
+            
+            const teams = appStore.get('teams') || [];
+            let pendingCount = 0;
+
             for(let phone in database) {
                 const s = database[phone];
                 
-                container.innerHTML += `
-                <div class="flex flex-col sm:flex-row items-center gap-4 p-4 border border-slate-200 rounded bg-white shadow-sm">
-                    <div class="relative w-16 h-16 shrink-0 transition-transform hover:scale-105">
-                        <img src="${s.avatar}" id="edit-img-${phone}" class="w-full h-full rounded-full object-cover border border-slate-300">
-                        <input type="file" accept="image/*" onchange="adminUI.updateStudentAvatar(event, '${phone}')" class="absolute inset-0 opacity-0 cursor-pointer" title="Update Profile Photo">
-                    </div>
-                    <div class="flex-1 w-full flex flex-col gap-1">
-                        <div class="flex justify-between items-start">
-                            <p class="font-bold text-slate-800 text-lg">${s.name}</p>
-                            <span class="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">${phone}</span>
-                        </div>
-                        
-                        <div class="flex gap-4 mt-2">
+                if (s.status === 'pending') {
+                    pendingCount++;
+                    if(pendingContainer) {
+                        pendingContainer.innerHTML += `
+                        <div class="flex flex-col sm:flex-row items-center gap-4 p-4 border border-amber-200 dark:border-amber-500/30 rounded-xl bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-3 transition-all">
+                            <img src="${s.avatar}" class="w-12 h-12 rounded-full object-cover border border-amber-300">
                             <div class="flex-1">
-                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">New Password</label>
-                                <input type="text" id="edit-pass-${phone}" placeholder="Reset Password..." class="border border-slate-300 p-2 text-sm rounded w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <p class="font-bold text-slate-800 dark:text-slate-200">${s.name}</p>
+                                <span class="text-xs font-mono text-slate-500">${phone}</span>
                             </div>
-                            <div class="flex-1">
-                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Assign Team</label>
-                                <select id="edit-team-${phone}" class="border border-slate-300 p-2 text-sm rounded w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50">
-                                    ${teams.map(t => `<option value="${t.id}" ${s.team === t.id ? 'selected' : ''}>${animalThemes[t.id].icon} ${animalThemes[t.id].name}</option>`).join('')}
-                                </select>
+                            <div class="flex gap-2">
+                                <button onclick="adminUI.approveStudent('${phone}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Approve</button>
+                                <button onclick="adminUI.deleteStudent('${phone}', true)" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Deny</button>
                             </div>
-                        </div>
-                    </div>
-                    <button onclick="adminUI.saveStudentEdit('${phone}')" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded shadow-md text-sm font-bold transition-colors mt-2 sm:mt-0 self-end">Save</button>
-                </div>`;
+                        </div>`;
+                    }
+                } else {
+                    if(container) {
+                        container.innerHTML += `
+                        <div class="flex flex-col sm:flex-row items-center gap-4 p-4 border border-slate-200 dark:border-white/10 rounded bg-white dark:bg-slate-800/40 shadow-sm mb-3">
+                            <div class="relative w-16 h-16 shrink-0 transition-transform hover:scale-105">
+                                <img src="${s.avatar}" id="edit-img-${phone}" class="w-full h-full rounded-full object-cover border border-slate-300">
+                                <input type="file" accept="image/*" onchange="adminUI.updateStudentAvatar(event, '${phone}')" class="absolute inset-0 opacity-0 cursor-pointer" title="Update Profile Photo">
+                            </div>
+                            <div class="flex-1 w-full flex flex-col gap-1">
+                                <div class="flex justify-between items-start">
+                                    <p class="font-bold text-slate-800 dark:text-white text-lg">${s.name}</p>
+                                    <span class="text-xs font-mono bg-slate-100 dark:bg-black/30 px-2 py-1 rounded text-slate-500 dark:text-slate-400">${phone}</span>
+                                </div>
+                                <div class="flex gap-4 mt-2">
+                                    <div class="flex-1">
+                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">New Password</label>
+                                        <input type="text" id="edit-pass-${phone}" placeholder="Reset Password..." class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white">
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Assign Team</label>
+                                        <select id="edit-team-${phone}" class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white">
+                                            ${teams.map(t => `<option value="${t.id}" ${s.team === t.id ? 'selected' : ''}>${animalThemes[t.id]?.name || t.id}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex gap-2 w-full sm:w-auto mt-3 sm:mt-0 self-end">
+                                <button onclick="adminUI.saveStudentEdit('${phone}')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Save</button>
+                                <button onclick="adminUI.deleteStudent('${phone}', false)" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Delete</button>
+                            </div>
+                        </div>`;
+                    }
+                }
             }
-        });
+            
+            const pWrap = document.getElementById('pending-approvals-wrapper');
+            if(pWrap) pWrap.classList.toggle('hidden', pendingCount === 0);
+        }).catch(e => console.warn("No student DB yet", e));
+    },
+
+    async approveStudent(phone) {
+        const db = await authManager.getDB('students');
+        if (db[phone]) {
+            db[phone].status = 'approved';
+            await authManager.saveDB(db, 'students');
+            window.toast("Student approved!", true);
+            this.renderStudentManagement();
+        }
+    },
+    
+    async deleteStudent(phone, isDenial = false) {
+        if(!confirm(`Are you sure you want to ${isDenial ? 'deny' : 'completely delete'} this student?`)) return;
+        
+        try {
+            const profId = appStore.get('currentProfId');
+            if (window.firebaseRef && window.firebaseSet) {
+                const dbRef = window.firebaseRef(window.firebaseDB, `professors/${profId}/students/${phone}`);
+                await window.firebaseSet(dbRef, null);
+            }
+            
+            const players = appStore.get('players') || {};
+            const peerId = Object.keys(players).find(id => players[id].phone === phone);
+            
+            if (peerId) {
+                delete players[peerId];
+                appStore.set('players', players);
+                this.updateLobbyList();
+                this.updateTeamScores();
+                
+                const pin = appStore.get('roomCode');
+                if (pin && window.firebaseRef && window.firebaseSet) {
+                    const studentRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students/${phone}`);
+                    await window.firebaseSet(studentRef, null);
+                }
+            }
+            
+            window.toast(`Student ${isDenial ? 'denied' : 'deleted'}.`, true);
+            this.renderStudentManagement(); 
+        } catch (err) { window.toast("Error modifying student.", false); }
     },
     
     async saveStudentEdit(oldPhone) {
-        const db = await authManager.getDB('feedbackStudentsDb'); 
+        const db = await authManager.getDB('students'); 
         const newPass = document.getElementById(`edit-pass-${oldPhone}`).value.trim(); 
         const newTeam = document.getElementById(`edit-team-${oldPhone}`).value;
         const newAvatar = document.getElementById(`edit-img-${oldPhone}`).dataset.newavatar;
@@ -308,14 +461,10 @@ export const adminUI = {
         const studentData = db[oldPhone];
         studentData.team = newTeam;
         if (newAvatar) studentData.avatar = newAvatar;
-        
-        if (newPass) {
-            studentData.pass = newPass; 
-        }
+        if (newPass) studentData.pass = newPass;
 
         db[oldPhone] = studentData;
-        
-        authManager.saveDB(db, 'feedbackStudentsDb'); 
+        authManager.saveDB(db, 'students'); 
         window.toast("Student account updated!", true);
         
         const players = appStore.get('players') || {};
@@ -360,18 +509,19 @@ export const adminUI = {
             const badgeColor = tailwindColors[theme.color].bg;
             const score = p.scores?.total || 0;
             
+            // 🔥 UPDATED: Added dark mode classes for professor lobby student list items 🔥
             list.innerHTML += `
-                <li class="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200 mb-2 shadow-sm transition-all">
+                <li class="flex items-center justify-between p-3 bg-white dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-white/10 mb-2 shadow-sm transition-all text-slate-800 dark:text-slate-100">
                     <div class="flex items-center gap-3">
-                        <img src="${p.avatar}" class="w-10 h-10 rounded-full border-2 ${p.border || 'border-slate-300'} bg-slate-100 object-cover">
+                        <img src="${p.avatar}" class="w-10 h-10 rounded-full border-2 ${p.border || 'border-slate-300'} bg-white object-cover">
                         <div class="flex flex-col">
-                            <span class="font-bold text-slate-800 text-sm leading-tight">${p.name}</span>
-                            <span class="text-[10px] font-bold text-slate-500 uppercase">${p.phone || 'Student'}</span>
+                            <span class="font-bold text-slate-800 dark:text-white text-sm leading-tight">${p.name}</span>
+                            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">${p.phone || 'Student'}</span>
                         </div>
                     </div>
                     <div class="flex flex-col items-end gap-1">
-                        <span class="text-xs font-bold text-white px-2 py-1 rounded-full ${badgeColor}">${theme.icon} ${theme.name}</span>
-                        <span class="text-xs font-black text-indigo-600 text-right w-full">${score} pts</span>
+                        <span class="text-xs font-bold text-white px-2 py-1 rounded-full ${badgeColor}">${theme.name} Team</span>
+                        <span class="text-xs font-black text-indigo-600 dark:text-indigo-400 text-right w-full">${score} pts</span>
                     </div>
                 </li>
             `;
@@ -396,7 +546,7 @@ export const adminUI = {
             <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3 border-2 border-slate-700 shadow-md">
                 <div class="w-3 h-12 rounded-full ${bgClass}"></div>
                 <div>
-                    <p class="${txtClass} font-bold text-[10px] tracking-widest uppercase">${theme.icon} ${theme.name}</p>
+                    <p class="${txtClass} font-bold text-[10px] tracking-widest uppercase">${theme.name}</p>
                     <p class="text-white font-black text-2xl leading-none">${score}</p>
                 </div>
             </div>`;
@@ -415,7 +565,9 @@ export const adminUI = {
         players.sort((a,b)=>(b.scores?.total || 0) - (a.scores?.total || 0)).forEach(p => { 
             const theme = animalThemes[p.team] || animalThemes['eagle'];
             const bgClass = tailwindColors[theme.color].bg;
-            l.innerHTML += `<div class="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-200"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full ${bgClass}"></div><span class="font-bold">${p.name}</span></div><div class="flex gap-3 text-xs"><span class="text-green-600">Spk: ${p.scores?.Speaking||0}</span><span class="text-blue-600">Wrt: ${p.scores?.Writing||0}</span><span class="text-purple-600">Lst: ${p.scores?.Listening||0}</span><span class="font-black text-indigo-800">Tot: ${p.scores?.total||0}</span></div></div>`; 
+            
+            // 🔥 UPDATED: Added dark mode classes for analytics detailed stats items 🔥
+            l.innerHTML += `<div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800/60 p-2 rounded border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full ${bgClass}"></div><span class="font-bold text-slate-800 dark:text-white">${p.name}</span></div><div class="flex gap-3 text-xs"><span class="text-green-600 dark:text-green-400">Spk: ${p.scores?.Speaking||0}</span><span class="text-blue-600 dark:text-blue-400">Wrt: ${p.scores?.Writing||0}</span><span class="text-purple-600 dark:text-purple-400">Lst: ${p.scores?.Listening||0}</span><span class="font-black text-indigo-800 dark:text-indigo-300">Tot: ${p.scores?.total||0}</span></div></div>`; 
         });
         
         const ctxEl = document.getElementById('classRadarChart');
@@ -481,14 +633,6 @@ export const adminUI = {
             isDraw=true; const r = c.getBoundingClientRect(); sX = e.clientX - r.left; sY = e.clientY - r.top; 
             if(box) box.remove(); box = document.createElement('div'); box.className='draw-box'; box.style.left=sX+'px'; box.style.top=sY+'px'; c.querySelector('div').appendChild(box); 
         };
-        c.onmousemove = (e) => { 
-            if(!isDraw) return; const r = c.getBoundingClientRect(); const cX = Math.min(Math.max(0, e.clientX-r.left), r.width); const cY = Math.min(Math.max(0, e.clientY-r.top), r.height); 
-            box.style.width=Math.abs(cX-sX)+'px'; box.style.height=Math.abs(cY-sY)+'px'; box.style.left=Math.min(sX,cX)+'px'; box.style.top=Math.min(sY,cY)+'px'; 
-        };
-        c.onmouseup = () => { 
-            isDraw=false; const r = c.getBoundingClientRect(); 
-            if(box) c.dataset.box = JSON.stringify({top: (parseFloat(box.style.top)/r.height)*100, left: (parseFloat(box.style.left)/r.width)*100, width: (parseFloat(box.style.width)/r.width)*100, height: (parseFloat(box.style.height)/r.height)*100}); 
-        };
     },
     
     addDrawnHotspot(modNum) {
@@ -501,6 +645,10 @@ export const adminUI = {
     },
     
     addItem(type) {
+        if(type==='memoryMatch') {
+            if(!window.lessonData.memoryMatch) window.lessonData.memoryMatch = [];
+            window.lessonData.memoryMatch.push({term: "Term", match: "Match", termImg: "", matchImg: ""});
+        }
         if(type==='vocab') window.lessonData.vocabulary.push({term: "Term", def: "Def"}); 
         if(type==='audioGuess') window.lessonData.audioGuess.push({ desc: "New", options: ["1", "2", "3", "4"], answer: 0, skill: "Listening" }); 
         if(type==='spellingBee') window.lessonData.spellingBee.push({ word: "New", skill: "Writing" }); 
@@ -514,24 +662,81 @@ export const adminUI = {
     
     renderContentEditors() {
         const _r = (id, arr, htmlFunc) => { const c = document.getElementById(id); if(c) { c.innerHTML=''; arr.forEach((d,i)=> c.innerHTML += htmlFunc(d,i)); } };
-        _r('admin-chat-list', window.lessonData.chatPhrases || [], (d,i) => `<div class="flex gap-1 pb-1"><input class="chat-phr text-xs p-1 flex-1 border rounded" data-idx="${i}" value="${d}"></div>`);
-        _r('admin-vocab-list', window.lessonData.vocabulary || [], (d,i) => `<div class="flex gap-1 pb-1"><input class="v-term text-xs p-1 w-1/3 border rounded" data-idx="${i}" value="${d.term}"><input class="v-def text-xs p-1 flex-1 border rounded" data-idx="${i}" value="${d.def}"></div>`);
-        _r('admin-audio-list', window.lessonData.audioGuess || [], (a, i) => `<div class="flex flex-col gap-1 pb-2 border-b"><textarea class="audio-desc p-1 border rounded text-xs h-10" data-idx="${i}">${a.desc}</textarea><div class="grid grid-cols-2 gap-1">${a.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="audio-ans-${i}" value="${oIdx}" ${a.answer === oIdx ? 'checked' : ''}><input type="text" class="audio-opt text-[10px] p-1 border rounded w-full" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>`);
-        _r('admin-spelling-list', window.lessonData.spellingBee || [], (s, i) => `<input type="text" class="spell-word w-full p-1 border rounded text-xs mb-1" value="${s.word}" data-idx="${i}">`);
-        _r('admin-hangman-list', window.lessonData.hangman || [], (h, i) => `<input type="text" class="hangman-phrase w-full p-1 border rounded text-xs mb-1 uppercase" value="${h.phrase}" data-idx="${i}">`);
-        _r('admin-read-list', window.lessonData.readAloud || [], (d,i) => `<textarea class="ra-text w-full text-xs p-1 border rounded mb-1" data-idx="${i}">${d.text}</textarea>`);
-        _r('admin-dict-list', window.lessonData.dictation || [], (d,i) => `<textarea class="dict-text w-full text-xs p-1 border rounded mb-1" data-idx="${i}">${d.text}</textarea>`);
-        _r('admin-quiz-list', window.lessonData.quiz || [], (q, i) => `<div class="flex flex-col gap-1 pb-2 border-b"><input type="text" class="quiz-q p-1 border rounded text-xs" value="${q.q}" data-idx="${i}"><div class="grid grid-cols-2 gap-1">${q.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="quiz-ans-${i}" value="${oIdx}" ${q.answer === oIdx ? 'checked' : ''}><input type="text" class="quiz-opt text-[10px] p-1 border rounded w-full" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>`);
-        _r('admin-mod3-list', window.lessonData.hotspots || [], (h, i) => `<div class="bg-white p-1 px-2 border rounded text-xs">Target: ${h.prompt}</div>`);
-        _r('admin-mod8-list', window.lessonData.wally || [], (w, i) => `<div class="bg-white p-1 px-2 border rounded text-xs">Target: ${w.prompt}</div>`);
+        
+        const delBtn = (type, i) => `<button onclick="adminUI.deleteItem('${type}', ${i})" class="shrink-0 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 w-8 h-8 flex items-center justify-center rounded-lg font-bold transition-colors ml-2" title="Delete Item">X</button>`;
+        
+        const memTypeSelect = document.getElementById('mod4-match-type');
+        const memType = memTypeSelect ? memTypeSelect.value : (window.lessonData.memoryMatchType || 'text-text');
+        if (memTypeSelect) memTypeSelect.value = memType;
+        
+        _r('admin-memory-list', window.lessonData.memoryMatch || [], (m, i) => {
+            let html = '<div class="flex items-center gap-2 pb-3 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1">';
+            const defaultImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E";
+            
+            if (memType === 'text-text') {
+                html += `<div class="flex gap-2"><input class="mem-term text-xs p-2 flex-1 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${m.term || ''}" placeholder="Term 1"><input class="mem-match text-xs p-2 flex-1 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${m.match || ''}" placeholder="Term 2"></div>`;
+            } else if (memType === 'image-text') {
+                html += `<div class="flex gap-2 items-center">
+                    <div class="relative w-12 h-12 shrink-0 bg-slate-100 dark:bg-slate-900/50 rounded border border-slate-300 dark:border-white/20 overflow-hidden">
+                        <img src="${m.termImg || defaultImg}" id="mem-img1-${i}" class="w-full h-full object-cover p-1">
+                        <input type="file" accept="image/*" onchange="adminUI.handleMemUpload(event, 'mem-img1-${i}', ${i}, 'termImg')" class="absolute inset-0 opacity-0 cursor-pointer">
+                    </div>
+                    <input class="mem-match text-xs p-2 flex-1 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${m.match || ''}" placeholder="Match Text">
+                </div>`;
+            } else {
+                html += `<div class="flex gap-2 items-center">
+                    <div class="relative w-12 h-12 shrink-0 bg-slate-100 dark:bg-slate-900/50 rounded border border-slate-300 dark:border-white/20 overflow-hidden">
+                        <img src="${m.termImg || defaultImg}" id="mem-img1-${i}" class="w-full h-full object-cover p-1">
+                        <input type="file" accept="image/*" onchange="adminUI.handleMemUpload(event, 'mem-img1-${i}', ${i}, 'termImg')" class="absolute inset-0 opacity-0 cursor-pointer">
+                    </div>
+                    <div class="relative w-12 h-12 shrink-0 bg-slate-100 dark:bg-slate-900/50 rounded border border-slate-300 dark:border-white/20 overflow-hidden">
+                        <img src="${m.matchImg || defaultImg}" id="mem-img2-${i}" class="w-full h-full object-cover p-1">
+                        <input type="file" accept="image/*" onchange="adminUI.handleMemUpload(event, 'mem-img2-${i}', ${i}, 'matchImg')" class="absolute inset-0 opacity-0 cursor-pointer">
+                    </div>
+                </div>`;
+            }
+            html += `</div>${delBtn('memoryMatch', i)}</div>`;
+            return html;
+        });
+
+        _r('admin-chat-list', window.lessonData.chatPhrases || [], (d,i) => `<div class="flex items-center gap-1 pb-1 w-full"><input class="chat-phr text-xs p-2 flex-1 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${d}">${delBtn('chatPhrase', i)}</div>`);
+        _r('admin-vocab-list', window.lessonData.vocabulary || [], (d,i) => `<div class="flex items-center gap-1 pb-1 w-full"><input class="v-term text-xs p-2 w-1/3 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${d.term}"><input class="v-def text-xs p-2 flex-1 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${d.def}">${delBtn('vocab', i)}</div>`);
+        _r('admin-audio-list', window.lessonData.audioGuess || [], (a, i) => `<div class="flex items-start gap-2 pb-2 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1 flex flex-col gap-1"><textarea class="audio-desc p-2 border border-slate-300 dark:border-white/20 rounded text-xs h-10 bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}">${a.desc}</textarea><div class="grid grid-cols-2 gap-1">${a.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="audio-ans-${i}" value="${oIdx}" ${a.answer === oIdx ? 'checked' : ''}><input type="text" class="audio-opt text-[10px] p-2 border border-slate-300 dark:border-white/20 rounded w-full bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>${delBtn('audioGuess', i)}</div>`);
+        _r('admin-spelling-list', window.lessonData.spellingBee || [], (s, i) => `<div class="flex items-center gap-1 w-full mb-1"><input type="text" class="spell-word w-full p-2 border border-slate-300 dark:border-white/20 rounded text-xs bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${s.word}" data-idx="${i}">${delBtn('spellingBee', i)}</div>`);
+        _r('admin-hangman-list', window.lessonData.hangman || [], (h, i) => `<div class="flex items-center gap-1 w-full mb-1"><input type="text" class="hangman-phrase w-full p-2 border border-slate-300 dark:border-white/20 rounded text-xs bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200 uppercase" value="${h.phrase}" data-idx="${i}">${delBtn('hangman', i)}</div>`);
+        _r('admin-read-list', window.lessonData.readAloud || [], (d,i) => `<div class="flex items-start gap-1 w-full mb-1"><textarea class="ra-text w-full text-xs p-2 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}">${d.text}</textarea>${delBtn('readAloud', i)}</div>`);
+        _r('admin-dict-list', window.lessonData.dictation || [], (d,i) => `<div class="flex items-start gap-1 w-full mb-1"><textarea class="dict-text w-full text-xs p-2 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}">${d.text}</textarea>${delBtn('dictation', i)}</div>`);
+        _r('admin-quiz-list', window.lessonData.quiz || [], (q, i) => `<div class="flex items-start gap-2 pb-2 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1 flex flex-col gap-1"><input type="text" class="quiz-q p-2 border border-slate-300 dark:border-white/20 rounded text-xs bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${q.q}" data-idx="${i}"><div class="grid grid-cols-2 gap-1">${q.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="quiz-ans-${i}" value="${oIdx}" ${q.answer === oIdx ? 'checked' : ''}><input type="text" class="quiz-opt text-[10px] p-2 border border-slate-300 dark:border-white/20 rounded w-full bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>${delBtn('quiz', i)}</div>`);
+        _r('admin-mod3-list', window.lessonData.hotspots || [], (h, i) => `<div class="bg-white dark:bg-black/30 p-2 border border-slate-300 dark:border-white/20 rounded text-xs flex justify-between items-center text-slate-800 dark:text-slate-200 mb-1"><span>Target: ${h.prompt}</span>${delBtn('hotspot', i)}</div>`);
+        _r('admin-mod8-list', window.lessonData.wally || [], (w, i) => `<div class="bg-white dark:bg-black/30 p-2 border border-slate-300 dark:border-white/20 rounded text-xs flex justify-between items-center text-slate-800 dark:text-slate-200 mb-1"><span>Target: ${w.prompt}</span>${delBtn('wally', i)}</div>`);
     },
     
     saveContent() {
+        const toggles = document.querySelectorAll('.module-toggle');
+        if(toggles.length > 0) {
+            window.lessonData.activeModules = Array.from(toggles).filter(cb => cb.checked).map(cb => parseInt(cb.dataset.mod));
+        }
+
+        if(!window.lessonData.memoryMatch) window.lessonData.memoryMatch = [];
+        const memTypeSelect = document.getElementById('mod4-match-type');
+        if(memTypeSelect) window.lessonData.memoryMatchType = memTypeSelect.value;
+        
+        document.querySelectorAll('.mem-term').forEach(e => {
+            if(window.lessonData.memoryMatch[e.dataset.idx]) window.lessonData.memoryMatch[e.dataset.idx].term = e.value;
+        });
+        document.querySelectorAll('.mem-match').forEach(e => {
+            if(window.lessonData.memoryMatch[e.dataset.idx]) window.lessonData.memoryMatch[e.dataset.idx].match = e.value;
+        });
+
         if(!window.lessonData.chatPhrases) window.lessonData.chatPhrases = []; document.querySelectorAll('.chat-phr').forEach(i => window.lessonData.chatPhrases[i.dataset.idx] = i.value);
         document.querySelectorAll('.v-term').forEach(e => window.lessonData.vocabulary[e.dataset.idx].term = e.value); document.querySelectorAll('.v-def').forEach(e => window.lessonData.vocabulary[e.dataset.idx].def = e.value);
         document.querySelectorAll('.audio-desc').forEach(i => window.lessonData.audioGuess[i.dataset.idx].desc = i.value); document.querySelectorAll('.audio-opt').forEach(i => window.lessonData.audioGuess[i.dataset.qidx].options[i.dataset.oidx] = i.value); window.lessonData.audioGuess.forEach((a, idx) => { const s = document.querySelector(`input[name="audio-ans-${idx}"]:checked`); if(s) a.answer = parseInt(s.value); });
         document.querySelectorAll('.spell-word').forEach(e => window.lessonData.spellingBee[e.dataset.idx].word = e.value); document.querySelectorAll('.hangman-phrase').forEach(e => window.lessonData.hangman[e.dataset.idx].phrase = e.value.toUpperCase());
         document.querySelectorAll('.ra-text').forEach(e => window.lessonData.readAloud[e.dataset.idx].text = e.value); document.querySelectorAll('.dict-text').forEach(e => window.lessonData.dictation[e.dataset.idx].text = e.value);
         document.querySelectorAll('.quiz-q').forEach(i => window.lessonData.quiz[i.dataset.idx].q = i.value); document.querySelectorAll('.quiz-opt').forEach(i => window.lessonData.quiz[i.dataset.qidx].options[i.dataset.oidx] = i.value); window.lessonData.quiz.forEach((q, idx) => { const s = document.querySelector(`input[name="quiz-ans-${idx}"]:checked`); if(s) q.answer = parseInt(s.value); });
+        
+        authManager.saveDB(window.lessonData, 'lessonData');
+        localStorage.setItem('profLessonData', JSON.stringify(window.lessonData));
+        window.toast("Lesson data saved globally!", true);
     }
 };

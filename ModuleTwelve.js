@@ -5,6 +5,24 @@ export class ModuleTwelve extends HTMLElement {
     
     connectedCallback() {
         this.render();
+        
+        // Smart Routing: Wait a tiny bit for the global state to be ready
+        setTimeout(() => {
+            const btn = this.querySelector('#btn-return-routing');
+            if (window.appStore && window.appStore.get('role') === 'host') {
+                btn.innerHTML = "Return to Control Center ⚙️";
+                btn.onclick = () => { 
+                    if(window.adminUI) window.adminUI.exitToLobby(); 
+                    else window.location.reload(); 
+                };
+            } else {
+                btn.innerHTML = "Return to Dashboard ➔";
+                btn.onclick = () => { 
+                    if(window.dashboardController) window.dashboardController.openDashboard(); 
+                    else window.location.reload(); 
+                };
+            }
+        }, 100);
     }
 
     render() {
@@ -26,11 +44,13 @@ export class ModuleTwelve extends HTMLElement {
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-6" id="student-skill-bars"></div>
                 </div>
                 
-                <button onclick="app.exitToHome()" class="w-full bg-slate-800 dark:bg-white/5 hover:bg-slate-900 dark:hover:bg-white/10 dark:border dark:border-white/10 text-white font-bold py-4 px-6 rounded-xl shadow-md transition-all duration-300 text-lg">Return Home ↺</button>
+                <!-- 🔥 SMART FIX: Dynamic routing button 🔥 -->
+                <button id="btn-return-routing" class="w-full bg-slate-800 dark:bg-indigo-600 hover:bg-slate-900 dark:hover:bg-indigo-500 dark:border-none border border-transparent text-white font-black tracking-wide py-5 px-6 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all hover:-translate-y-1 text-xl">
+                    Loading Route...
+                </button>
             </div>
         `;
     }
 }
 
-// 🚀 Register the custom tag with the browser
 customElements.define('module-twelve', ModuleTwelve);

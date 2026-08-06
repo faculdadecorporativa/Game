@@ -23,10 +23,17 @@ export class AppModals extends HTMLElement {
 
                     <input type="email" id="prof-email" class="w-full p-3 mb-3 bg-slate-100 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-500/60 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 dark:text-white transition-colors duration-300" placeholder="Email Address">
                     
-                    <div class="relative w-full mb-6">
+                    <div class="relative w-full mb-2">
                         <input type="password" id="prof-pass" class="w-full p-3 bg-slate-100 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-500/60 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 dark:text-white transition-colors duration-300" placeholder="Password">
                         <button type="button" onclick="window.authUI.toggleVisibility('prof-pass')" class="absolute right-4 top-3.5 text-xl opacity-60 hover:opacity-100 cursor-pointer dark:text-white">
                             👁️
+                        </button>
+                    </div>
+
+                    <!-- 🔥 NEW: Forgot Password Button Container 🔥 -->
+                    <div class="text-right w-full mb-6" id="p-forgot-pass-container">
+                        <button onclick="window.authUI.resetProfPassword()" type="button" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-xs font-bold transition-colors cursor-pointer">
+                            Forgot Password?
                         </button>
                     </div>
 
@@ -145,9 +152,9 @@ export class AppModals extends HTMLElement {
                     
                     <div class="mb-4">
                         <label for="professor-select" class="block text-sm font-medium text-slate-700 dark:text-slate-300 text-left mb-1 transition-colors duration-300">Select Your Professor</label>
+                        <!-- 🔥 Fixed explicit ID mapping to authController.js 🔥 -->
                         <select id="professor-select" class="w-full p-3 border border-slate-300 dark:border-slate-500/60 rounded-lg bg-slate-100 dark:bg-slate-700/80 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer dark:text-white transition-colors duration-300" required>
                             <option value="" disabled selected>Select a Professor...</option>
-                            <option value="PROFESSOR_UID_HERE">Professor Name</option>
                         </select>
                     </div>
                     

@@ -8,7 +8,6 @@
     <!-- CDNs -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 🔥 SENIOR ARCHITECTURE: Enable Manual Dark Mode Toggle -->
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -17,11 +16,7 @@
 
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- PDF.js Library for AI Course Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-
-    <!-- EMAILJS SDK -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script type="text/javascript">
        (function(){
@@ -30,11 +25,8 @@
     </script>
 
     <style>
-        /* Base & Animations */
         .fade-in { animation: fadeIn 0.4s ease-in-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* 3D Flip Cards */
         .perspective-1000 { perspective: 1000px; }
         .transform-style-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
@@ -42,42 +34,44 @@
         .flip-card-inner { transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); }
         .flipped .flip-card-inner { transform: rotateY(180deg); }
         .matched { opacity: 0.5; pointer-events: none; filter: grayscale(100%); }
-
-        /* General Utilities */
         .correct-word { color: #4ade80; font-weight: bold; text-shadow: 0 0 8px rgba(74,222,128,0.4); }
         .missed-word { color: #fb7185; text-decoration: line-through; font-weight: bold; }
         .lifeline-btn:disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(100%); transform: none !important; box-shadow: none !important; }
         #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; display: none; }
-
-        /* Loader */
         .loader { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #6366f1; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto; box-shadow: 0 0 15px rgba(99,102,241,0.3); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Toasts */
         #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+
+        #wait-overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px) !important; z-index: 999999 !important; display: block !important; }
+        #wait-overlay.hidden { display: none !important; }
+        #wait-box { position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; background-color: #1e293b !important; padding: 3rem !important; border-radius: 2rem !important; border: 2px solid #4f46e5 !important; box-shadow: 0 0 50px rgba(79, 70, 229, 0.6) !important; text-align: center !important; display: flex !important; flex-direction: column !important; align-items: center !important; min-width: 320px !important; }
+        #wait-box h2 { color: #ffffff !important; font-size: 2.5rem !important; font-weight: 900 !important; margin-top: 1.5rem !important; margin-bottom: 0.5rem !important; text-shadow: 0 4px 10px rgba(0,0,0,0.5) !important; }
+        #wait-box p { color: #818cf8 !important; font-size: 1.25rem !important; font-weight: bold !important; text-transform: uppercase !important; letter-spacing: 0.2em !important; margin: 0 !important; }
+        #wait-countdown { color: #ffffff !important; font-size: 6rem !important; font-weight: 900 !important; margin-top: 1.5rem !important; text-shadow: 0 4px 20px rgba(0,0,0,0.5) !important; }
+        #wait-countdown.hidden { display: none !important; }
+
+        html.dark { color-scheme: dark; }
+        html.dark select, html.dark option, html.dark optgroup { background-color: #1e293b !important; color: #f1f5f9 !important; }
+        
+        /* Smooth scrolling for the tabs */
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.5); border-radius: 10px; }
     </style>
     
-    <!-- EXPERT CONFETTI CANNON -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script>
         window.startConfetti = function() {
-            confetti({
-                particleCount: 150,
-                spread: 80,
-                origin: { y: 0.6 },
-                zIndex: 9999
-            });
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, zIndex: 9999 });
         };
     </script>
 </head>
 
 <body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white relative overflow-x-hidden pb-12 transition-colors duration-300">
     
-    <!-- 🔥 FIXED: Tech glowing orbs hidden in Light Mode, visible in Dark Mode 🔥 -->
     <div class="hidden dark:block fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
     <div class="hidden dark:block fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
 
-    <!-- 🔥 FIREBASE INITIALIZATION 🔥 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
         import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-database.js";
@@ -107,7 +101,7 @@
         window.firebaseSignOut = signOut;
         window.firebaseOnValue = onValue;
         
-        console.log("🔥 Firebase connected!");
+        console.log("Firebase connected!");
     </script>
 
     <div id="toast-container"></div>
@@ -117,37 +111,155 @@
         <div class="w-16 h-16 rounded-full bg-indigo-100 dark:bg-slate-800/80 backdrop-blur-md border border-indigo-600 dark:border-indigo-500/50 flex items-center justify-center text-4xl shadow-xl dark:shadow-[0_0_15px_rgba(99,102,241,0.3)] transform scale-x-[-1]">👨‍🏫</div>
     </div>
 
-    <div id="wait-overlay" class="fixed inset-0 bg-slate-900/90 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-        <div class="text-center w-full max-w-lg mx-4">
-            <div class="bg-slate-800 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-2xl dark:rounded-3xl shadow-2xl dark:shadow-[0_0_40px_rgba(99,102,241,0.2)] border border-slate-700 dark:border-white/10">
-                <div class="loader mb-4 dark:mb-6"></div>
-                <h2 class="text-3xl font-bold animate-pulse text-indigo-400 mb-2 dark:mb-3 tracking-wide">Processing...</h2>
-                <p class="text-slate-300 dark:text-slate-400 font-medium">Validating answer data matrix</p>
-            </div>
+    <div id="wait-overlay" class="hidden">
+        <div id="wait-box">
+            <div class="loader mb-6 border-4 border-white/10 border-t-indigo-500 rounded-full w-16 h-16 animate-spin"></div>
+            <h2>Waiting for others...</h2>
+            <p>Hold tight!</p>
         </div>
     </div>
 
     <app-header class="relative z-20"></app-header>
 
-    <main class="max-w-6xl mx-auto px-4 py-8 relative z-10">
+    <main class="w-full max-w-[1920px] mx-auto px-2 sm:px-6 py-8 relative z-10 transition-all duration-300">
         
         <role-selection id="module-0"></role-selection>
-        <module-join-pin id="module-join-pin" class="hidden fade-in w-full block mt-20"></module-join-pin>
+        <module-join-pin id="module-join-pin" class="hidden fade-in w-full block mt-20 dark:bg-slate-900/40 dark:backdrop-blur-2xl border border-transparent dark:border-white/10 dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-3xl p-8 max-w-md mx-auto text-center dark:text-white transition-all duration-300"></module-join-pin>
         <prof-dashboard id="module-admin" class="hidden fade-in w-full block"></prof-dashboard>
         <student-lobby id="module-waiting" class="hidden fade-in w-full block mt-20"></student-lobby>
 
-        <!-- 🔥 FIX: Ensure lifelines panel also uses the solid white trick in Light Mode -->
+        <!-- STUDENT DASHBOARD MODULE -->
+        <student-dashboard id="module-dashboard" class="hidden fade-in w-full block mt-20">
+            <div class="max-w-4xl mx-auto bg-slate-100 dark:bg-slate-900/40 backdrop-blur-2xl border border-slate-200 dark:border-indigo-500/30 rounded-3xl p-8 shadow-2xl">
+                
+                <div class="flex flex-col md:flex-row items-center gap-6 mb-8 border-b border-slate-300 dark:border-white/10 pb-6">
+                    <div class="w-24 h-24 rounded-full border-4 border-indigo-500 bg-slate-800 flex items-center justify-center text-4xl overflow-hidden">
+                        <img id="dash-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" class="w-full h-full object-cover hidden" alt="Avatar">
+                        👤
+                    </div>
+                    <div class="flex-1 text-center md:text-left">
+                        <h2 id="dash-name" class="text-3xl font-black dark:text-white mb-1">Student Name</h2>
+                        <p id="dash-title" class="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest text-sm mb-3">Novice Learner</p>
+                        
+                        <div class="flex items-center gap-4">
+                            <span id="dash-level" class="font-bold text-slate-700 dark:text-slate-200 min-w-[70px]">Level 1</span>
+                            <div class="flex-1 h-3 bg-slate-300 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                                <div id="dash-progress-bar" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full w-0 transition-all duration-1000"></div>
+                            </div>
+                            <span id="dash-xp" class="text-xs text-slate-500 font-bold">0 / 100 XP</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-row md:flex-col gap-4 text-center">
+                        <div class="bg-amber-100 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 px-4 py-2 rounded-xl">
+                            <span class="block text-2xl mb-1">🪙</span>
+                            <span id="dash-coins" class="font-black text-amber-600 dark:text-amber-400">0</span>
+                        </div>
+                        <div class="bg-rose-100 dark:bg-rose-500/10 border border-rose-300 dark:border-rose-500/30 px-4 py-2 rounded-xl">
+                            <span class="block text-2xl mb-1">🔥</span>
+                            <span id="dash-streak" class="font-black text-rose-600 dark:text-rose-400">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-xl font-bold dark:text-slate-200 mb-4 uppercase tracking-wider text-slate-500 text-sm">Performance Stats</h3>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-white/5 text-center">
+                                <p class="text-xs text-slate-500 mb-1">Total Pts</p>
+                                <p id="stat-total" class="font-black text-xl dark:text-white">0</p>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-white/5 text-center">
+                                <p class="text-xs text-slate-500 mb-1">General</p>
+                                <p id="stat-general" class="font-black text-xl dark:text-white">0</p>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-white/5 text-center">
+                                <p class="text-xs text-slate-500 mb-1">Listening</p>
+                                <p id="stat-listening" class="font-black text-xl dark:text-white">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xl font-bold dark:text-slate-200 mb-4 uppercase tracking-wider text-slate-500 text-sm">Active Locker</h3>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="relative bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-500/30 p-3 rounded-xl text-center">
+                                <span class="absolute -top-2 -right-2 bg-indigo-500 text-white text-xs font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900" id="inv-extraLife">0</span>
+                                <span class="text-3xl block mb-1 drop-shadow-md">🛡️</span>
+                                <p class="text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-300">Extra Life</p>
+                            </div>
+                            <div class="relative bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-500/30 p-3 rounded-xl text-center">
+                                <span class="absolute -top-2 -right-2 bg-cyan-500 text-white text-xs font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900" id="inv-freezeTime">0</span>
+                                <span class="text-3xl block mb-1 drop-shadow-md">❄️</span>
+                                <p class="text-[10px] uppercase font-bold text-cyan-700 dark:text-cyan-300">Freeze</p>
+                            </div>
+                            <div class="relative bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-500/30 p-3 rounded-xl text-center">
+                                <span class="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900" id="inv-timeBurn">0</span>
+                                <span class="text-3xl block mb-1 drop-shadow-md">🔥</span>
+                                <p class="text-[10px] uppercase font-bold text-rose-700 dark:text-rose-300">Burn</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 flex justify-center gap-4">
+                    <button onclick="window.shopController.openShop()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-8 rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-all hover:-translate-y-1">🛒 Open Store</button>
+                    <button onclick="window.game.startModule(1, 0)" class="bg-slate-200 dark:bg-slate-800 hover:dark:bg-slate-700 text-slate-800 dark:text-white font-bold py-3 px-8 rounded-xl transition-all">Play Game</button>
+                </div>
+            </div>
+        </student-dashboard>
+
+        <!-- DYNAMIC TABBED GAMIFIED SHOP MODULE -->
+        <gamified-shop id="module-shop" class="hidden fade-in w-full block mt-10 mb-20">
+            <div class="max-w-5xl mx-auto bg-slate-100 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-300 dark:border-indigo-500/50 rounded-[2rem] p-6 md:p-12 shadow-[0_0_50px_rgba(99,102,241,0.2)]">
+                
+                <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-6 border-b border-slate-300 dark:border-white/10 pb-8">
+                    <div class="text-center md:text-left">
+                        <h2 class="text-4xl font-black text-slate-900 dark:text-white drop-shadow-md tracking-tight">Premium Store</h2>
+                        <p class="text-indigo-600 dark:text-indigo-400 font-bold mt-2 uppercase tracking-widest text-sm">Upgrade your gameplay & profile</p>
+                    </div>
+                    <div class="bg-amber-100 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 px-6 py-3 rounded-2xl flex items-center gap-3 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                        <span class="text-3xl drop-shadow-md">🪙</span>
+                        <span id="shop-coins" class="font-black text-amber-600 dark:text-amber-400 text-3xl">0</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 md:gap-4 mb-8 overflow-x-auto pb-2 custom-scrollbar justify-start md:justify-center">
+                    <button onclick="window.shopController.switchTab('consumables')" id="tab-btn-consumables" class="shop-tab-btn flex-1 min-w-[150px] bg-indigo-600 text-white font-black py-4 px-6 rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-all transform hover:-translate-y-1">⚡ Consumables</button>
+                    <button onclick="window.shopController.switchTab('cosmetics')" id="tab-btn-cosmetics" class="shop-tab-btn flex-1 min-w-[150px] bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-4 px-6 rounded-xl transition-all transform hover:-translate-y-1">🖼️ Cosmetics</button>
+                    <button onclick="window.shopController.switchTab('titles')" id="tab-btn-titles" class="shop-tab-btn flex-1 min-w-[150px] bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-4 px-6 rounded-xl transition-all transform hover:-translate-y-1">🎖️ Titles</button>
+                </div>
+
+                <!-- Items dynamically injected here -->
+                <div id="shop-items-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+                <div class="mt-12 text-center pt-8">
+                    <button onclick="window.dashboardController.openDashboard()" class="text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white font-black text-lg transition-colors flex items-center justify-center gap-2 mx-auto uppercase tracking-widest">
+                        <span>← Return to Dashboard</span>
+                    </button>
+                </div>
+            </div>
+        </gamified-shop>
+
         <div id="lifelines-panel" class="hidden max-w-3xl mx-auto mb-6 bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl border border-slate-200 dark:border-white/10 p-3 rounded-xl dark:rounded-2xl shadow-lg dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex justify-center space-x-2 sm:space-x-4 relative z-10 transition-colors duration-300">
             <button onclick="window.lifelineManager.use('fiftyFifty')" id="ll-fiftyFifty" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-lg sm:text-xl font-black text-indigo-600 dark:text-white">50/50</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Half Off</span></button>
             <button onclick="window.lifelineManager.use('askProf')" id="ll-askProf" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">👨‍🏫</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Ask Prof</span></button>
             <button onclick="window.lifelineManager.use('google')" id="ll-google" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">🌐</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Database</span></button>
             <button onclick="window.lifelineManager.use('callFriend')" id="ll-callFriend" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">📞</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Comm-Link</span></button>
+            <button onclick="window.lifelineManager.use('freezeTime')" id="ll-freezeTime" class="lifeline-btn flex flex-col items-center justify-center bg-cyan-100 dark:bg-cyan-900/20 hover:bg-cyan-500 text-cyan-800 dark:text-cyan-200 border border-cyan-200 dark:border-cyan-500/30 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all hover:-translate-y-1">
+                <span class="text-xl dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">❄️</span>
+                <span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 font-bold">Freeze</span>
+            </button>
+            <button onclick="window.lifelineManager.use('timeBurn')" id="ll-timeBurn" class="lifeline-btn flex flex-col items-center justify-center bg-rose-100 dark:bg-rose-900/20 hover:bg-rose-500 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-500/30 hover:shadow-[0_0_15px_rgba(244,63,94,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all hover:-translate-y-1">
+                <span class="text-xl dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">🔥</span>
+                <span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 font-bold">Burn</span>
+            </button>
         </div>
 
         <module-one id="module-1" class="hidden fade-in text-center max-w-4xl mx-auto"></module-one>
-        <module-two id="module-2" class="hidden fade-in text-center"></module-two>
+        <module-two id="module-2" class="hidden fade-in text-center max-w-4xl mx-auto"></module-two>
         <module-three id="module-3" class="hidden fade-in text-center max-w-4xl mx-auto"></module-three>
-        <module-four id="module-4" class="hidden fade-in text-center max-w-4xl mx-auto"></module-four>
+        <module-four id="module-4" class="hidden fade-in text-center w-full mx-auto"></module-four>
         <module-five id="module-5" class="hidden fade-in text-center max-w-2xl mx-auto"></module-five>
         <module-six id="module-6" class="hidden fade-in text-center max-w-xl mx-auto"></module-six>
         <module-seven id="module-7" class="hidden fade-in text-center max-w-3xl mx-auto"></module-seven>
@@ -174,13 +286,14 @@
         import { shopManager, aiSimulator, timerManager, imageManager } from './Utilities.js';
         import { systemsCheck } from './SystemsCheck.js';
 
-        // UI COMPONENTS
         import './AppHeader.js';
         import './AppModals.js';
         import './RoleSelection.js';
         import './ModuleJoinPin.js'; 
         import './ProfDashboard.js';
         import './StudentLobby.js';
+        import { dashboardController } from './StudentDashboardController.js';
+        import { shopController } from './ShopController.js';
         import './ModuleOne.js';
         import './ModuleTwo.js';
         import './ModuleThree.js'; 
@@ -193,12 +306,13 @@
         import './ModuleTen.js';
         import './ModuleEleven.js';
         import './ModuleTwelve.js';
+        import { syncManager } from './StateSyncController.js';
+        import { databaseJanitor } from './JanitorController.js';
 
         window.lessonData = JSON.parse(JSON.stringify(defaultLessonData));
         window.cyberSecurityMockData = cyberSecurityMockData;
         window.appState = appStore.state; 
 
-        // Sound Effects & Utilities
         window.sfx = {
             play(type) {
                 try {
@@ -222,7 +336,6 @@
         window.speakText = (text) => { if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); window.speechSynthesis.speak(u); } };
         window.shuffleArray = (arr) => arr.sort(() => Math.random() - 0.5);
 
-        // Window Exposure
         window.app = app;
         window.appStore = appStore;
         window.authManager = authManager;
@@ -235,12 +348,14 @@
         window.shopManager = shopManager;
         window.aiSimulator = aiSimulator;
         window.imageManager = imageManager;
+        window.dashboardController = dashboardController;
+        window.shopController = shopController;
+        window.syncManager = syncManager;
+        window.databaseJanitor = databaseJanitor;
 
-        // Run Systems Check
         if(typeof systemsCheck !== 'undefined' && systemsCheck.run) {
             systemsCheck.run();
         }
     </script>
-    <script src="customAuthLogic.js"></script>
 </body>
 </html>

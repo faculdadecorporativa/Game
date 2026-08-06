@@ -1,10 +1,9 @@
-// 🏗️ UIController.js
-// Handles purely visual updates and bulletproof screen transitions.
+// UIController.js
+// Handles visual updates
 
 import { tailwindColors, animalThemes } from './data.js';
 import { appStore } from './store.js';
 
-// Helper function used for final leaderboard medals
 function getRankEmoji(score, allPlayers) {
     const uniqueScores = [...new Set(allPlayers.map(p => p.score || p.scores?.total || 0))].sort((a, b) => b - a);
     const rank = uniqueScores.indexOf(score);
@@ -15,7 +14,6 @@ const hangmanArtFrames = ["\n\n\n\n\n=======", "\n |\n |\n |\n |\n=======", " +-
 
 export const uiManager = {
     
-    // 🔥 BULLETPROOF HIDING METHOD
     hideAll() { 
         const allModules = [
             'module-0', 'module-join-pin', 'module-waiting', 'module-admin', 
@@ -26,9 +24,7 @@ export const uiManager = {
         allModules.forEach(id => { 
             const el = document.getElementById(id); 
             if (el) {
-                // If it is the professor dashboard AND they are host, do not hide it
                 if (appStore.get('role') === 'host' && id === 'module-admin') return; 
-                // If professor has Live View open, don't hide the active module
                 if (appStore.get('role') === 'host' && appStore.get('isLiveViewOpen') && id === `module-${appStore.get('currentModule')}`) return;
                 
                 el.classList.add('hidden'); 
@@ -48,13 +44,13 @@ export const uiManager = {
         const status = document.getElementById('game-status');
         if (status) status.classList.remove('hidden');
         
-        // Use auth object safely to display name
-        const profName = window.firebaseAuth && window.firebaseAuth.currentUser ? window.firebaseAuth.currentUser.email : 'Professor';
-        
+        const profName = appStore.get('profName') || "Professor"; 
+        const savedAvatar = localStorage.getItem('profAvatar') || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+
         if (c) {
             c.innerHTML = `
                 <div id="prof-hud-container" class="flex items-center bg-indigo-900 rounded-full pr-4 p-1 border border-indigo-600 shadow-inner">
-                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-2xl border-2 border-yellow-300 mr-3">👨‍🏫</div>
+                    <img src="${savedAvatar}" alt="Prof" class="w-10 h-10 rounded-full border-2 border-yellow-300 mr-3 object-cover bg-white">
                     <div class="flex flex-col leading-tight text-left">
                         <span class="text-xs text-indigo-300 uppercase tracking-widest font-bold">Host</span>
                         <span class="text-sm font-bold text-yellow-300" id="prof-hud-name">${profName}</span>
@@ -75,7 +71,7 @@ export const uiManager = {
         <div class="flex items-center bg-indigo-900 rounded-full pr-4 p-1 border border-indigo-600">
             <img src="${me.avatar}" class="w-10 h-10 rounded-full border-4 ${me.border || 'border-slate-300'} object-cover bg-white mr-3">
             <div class="flex flex-col leading-tight">
-                <span class="text-xs text-indigo-300 font-bold">${me.name} <span class="${tColorClass} ml-1">[${myTheme.icon} ${myTheme.name}]</span></span>
+                <span class="text-xs text-indigo-300 font-bold">${me.name} <span class="${tColorClass} ml-1">[${myTheme.name}]</span></span>
                 <span class="text-sm font-bold text-yellow-300">Score: ${me.scores?.total || 0}</span>
             </div>
         </div>`;
@@ -134,12 +130,9 @@ export const uiManager = {
         }
     },
 
-    // ---------------------------------------------------------
-    // COMPONENT RENDERERS
-    // ---------------------------------------------------------
     renderStudy() {
         const c = document.getElementById('flashcards-container'); if(!c) return; c.innerHTML = '';
-        window.lessonData.vocabulary.forEach(item => { c.innerHTML += `<div class="perspective-1000 h-48 w-full group"><div class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-md rounded-xl cursor-pointer" onclick="this.parentElement.classList.toggle('flipped')"><div class="backface-hidden absolute w-full h-full bg-white border border-slate-200 rounded-xl flex flex-col justify-center items-center p-4"><h3 class="text-xl font-bold text-indigo-800">${item.term}</h3><button onclick="event.stopPropagation(); window.speakText('${item.term}');" class="mt-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-2 rounded-full transition-colors">🔊 Listen</button></div><div class="backface-hidden rotate-y-180 absolute w-full h-full bg-indigo-600 rounded-xl flex justify-center items-center p-4"><p class="text-white font-medium text-sm md:text-base">${item.def}</p></div></div></div>`; });
+        window.lessonData.vocabulary.forEach(item => { c.innerHTML += `<div class="perspective-1000 h-48 w-full group"><div class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-md rounded-xl cursor-pointer" onclick="this.parentElement.classList.toggle('flipped')"><div class="backface-hidden absolute w-full h-full bg-white border border-slate-200 rounded-xl flex flex-col justify-center items-center p-4"><h3 class="text-xl font-bold text-indigo-800">${item.term}</h3><button onclick="event.stopPropagation(); window.speakText('${item.term}');" class="mt-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-2 rounded-full transition-colors">Listen</button></div><div class="backface-hidden rotate-y-180 absolute w-full h-full bg-indigo-600 rounded-xl flex justify-center items-center p-4"><p class="text-white font-medium text-sm md:text-base">${item.def}</p></div></div></div>`; });
     },
     
     renderDnD(data) {
@@ -168,17 +161,127 @@ export const uiManager = {
     },
     
     renderMemoryGrid(cards) {
-        const container = document.getElementById('memory-grid'); container.innerHTML = '';
+        let container = document.getElementById('memory-grid'); 
+        
+        if (!container) {
+            const mod4 = document.getElementById('module-4');
+            if (mod4) {
+                mod4.innerHTML = `
+                    <span class="text-indigo-600 dark:text-white font-bold tracking-wider uppercase text-sm transition-colors duration-300">Module 4 of 11</span>
+                    <h2 class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 mb-6 transition-colors duration-300">Memory Match</h2>
+                    <div id="lifeline-mount-4"></div>
+                    <div class="bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl p-4 md:p-6 rounded-3xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 relative pb-14 transition-all duration-300 w-full mx-auto">
+                        <div class="mb-4 flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">
+                            <span id="memory-progress" class="text-sm font-bold text-slate-500 dark:text-slate-300 transition-colors duration-300"></span>
+                            <span class="text-sm font-bold text-indigo-600 dark:text-white transition-colors duration-300">+3 Pts / -1 Pt</span>
+                        </div>
+                        <div id="memory-grid" class="grid gap-2 sm:gap-3 md:gap-4 w-full transition-all duration-500 mx-auto"></div>
+                        <div id="memory-feedback" class="mt-4 font-bold text-xl text-slate-800 dark:text-white absolute bottom-4 w-full left-0 opacity-0 transition-opacity"></div>
+                    </div>
+                `;
+                container = document.getElementById('memory-grid');
+                
+                const panel = document.getElementById('lifelines-panel');
+                const mount = document.getElementById('lifeline-mount-4');
+                if (panel && mount) {
+                    panel.classList.remove('hidden');
+                    mount.appendChild(panel);
+                }
+            } else {
+                return;
+            }
+        }
+        
+        container.className = 'grid gap-2 sm:gap-3 md:gap-4 w-full mx-auto';
+        
+        let colsMobile = 3, colsTablet = 4, colsDesktop = 6;
+        if (cards.length > 36) { colsMobile = 4; colsTablet = 8; colsDesktop = 12; }
+        else if (cards.length > 24) { colsMobile = 4; colsTablet = 6; colsDesktop = 10; }
+        else if (cards.length > 16) { colsMobile = 4; colsTablet = 6; colsDesktop = 8; }
+        else if (cards.length > 8) { colsMobile = 3; colsTablet = 4; colsDesktop = 6; }
+        else { colsMobile = 2; colsTablet = 3; colsDesktop = 4; }
+        
+        const styleId = 'dynamic-grid-style';
+        let styleEl = document.getElementById(styleId);
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        
+        styleEl.innerHTML = `
+            #memory-grid { grid-template-columns: repeat(${colsMobile}, minmax(0, 1fr)); }
+            @media (min-width: 640px) { #memory-grid { grid-template-columns: repeat(${colsTablet}, minmax(0, 1fr)); } }
+            @media (min-width: 1024px) { #memory-grid { grid-template-columns: repeat(${colsDesktop}, minmax(0, 1fr)); } }
+            
+            .perspective-1000 { perspective: 1000px; }
+            .transform-style-3d { transform-style: preserve-3d; }
+            .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+            .rotate-y-180 { transform: rotateY(180deg); }
+            .front-face, .back-face {
+                border-radius: 1rem !important; overflow: hidden !important; 
+                position: absolute !important; top: 0; left: 0; width: 100% !important; height: 100% !important;
+                background-color: #ffffff !important; border: 1px solid #e2e8f0 !important;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            }
+            .dark .front-face, .dark .back-face {
+                background-color: rgba(30, 30, 40, 0.6) !important; border: 1px solid rgba(99, 102, 241, 0.4) !important; 
+                box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important; backdrop-filter: blur(16px) !important;
+            }
+            #memory-grid .flipped .flip-card-inner, #memory-grid .matched .flip-card-inner { transform: rotateY(180deg) !important; }
+            #memory-grid .matched .back-face { background-color: #22c55e !important; border-color: #16a34a !important; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.4) !important; }
+            .dark #memory-grid .matched .back-face { background-color: rgba(79, 70, 229, 0.8) !important; border-color: #ffffff !important; box-shadow: 0 0 20px rgba(79, 70, 229, 0.8) !important; }
+            #memory-grid img { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 1rem !important; pointer-events: none !important; }
+            #memory-grid * { color: #1e293b !important; }
+            #memory-grid .matched .back-face * { color: #ffffff !important; }
+            .dark #memory-grid * { color: #ffffff !important; }
+        `;
+
+        container.innerHTML = '';
+        
         cards.forEach((card, idx) => {
-            const cDiv = document.createElement('div'); cDiv.className = "perspective-1000 h-32 w-full";
-            let backContent = card.type === 'term' ? `<h3 class="font-bold text-white text-lg leading-tight px-1">${card.content}</h3>` : (card.isImg ? `<img src="${card.content}" class="w-full h-full object-cover rounded-xl border border-white">` : `<p class="text-white text-xs md:text-sm font-medium px-2 leading-tight overflow-hidden">${card.content}</p>`);
-            cDiv.innerHTML = `<div id="memory-card-${idx}" class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow cursor-pointer" onclick="window.game.handleMemoryClick(${idx})"><div class="backface-hidden absolute w-full h-full bg-slate-200 border-2 border-slate-300 rounded-xl flex items-center justify-center text-slate-400 text-3xl font-black">?</div><div class="backface-hidden rotate-y-180 absolute w-full h-full bg-indigo-600 rounded-xl flex items-center justify-center p-1">${backContent}</div></div>`;
+            const cDiv = document.createElement('div'); 
+            cDiv.className = "perspective-1000 w-full aspect-square";
+            
+            let backContent = '';
+            const safeContent = String(card.content || "");
+            
+            if (safeContent.includes('<img') || safeContent.startsWith('data:image')) {
+                if (safeContent.includes('<img')) {
+                    backContent = safeContent.replace('<img ', '<img class="w-full h-full object-cover rounded-lg absolute inset-0 z-10" ');
+                } else {
+                    backContent = `<img src="${safeContent}" alt="Match Image" class="w-full h-full object-cover rounded-lg absolute inset-0 z-10">`;
+                }
+            } else {
+                backContent = `<span class="font-bold text-base md:text-xl xl:text-2xl leading-tight px-1 break-words relative z-10 max-h-full overflow-hidden flex items-center justify-center">${safeContent}</span>`;
+            }
+
+            cDiv.innerHTML = `
+                <div id="memory-card-${idx}" class="flip-card-inner transform-style-3d transition-transform duration-500 relative w-full h-full text-center cursor-pointer" onclick="window.game.handleMemoryClick(${idx})">
+                    <div class="front-face backface-hidden absolute w-full h-full flex items-center justify-center text-3xl md:text-4xl font-black rounded-xl border border-slate-200 dark:border-indigo-500/30">?</div>
+                    <div class="back-face backface-hidden rotate-y-180 absolute w-full h-full flex items-center justify-center rounded-xl relative border border-slate-200 dark:border-indigo-500/30">
+                        ${backContent}
+                    </div>
+                </div>`;
             container.appendChild(cDiv);
         });
     },
-    flipMemoryCard(idx) { document.getElementById(`memory-card-${idx}`).parentElement.classList.add('flipped'); },
-    unflipMemoryCard(idx) { document.getElementById(`memory-card-${idx}`).parentElement.classList.remove('flipped'); },
-    markMemoryMatched(idx1, idx2) { document.getElementById(`memory-card-${idx1}`).parentElement.classList.add('matched'); document.getElementById(`memory-card-${idx2}`).parentElement.classList.add('matched'); },
+
+    flipMemoryCard(idx) { 
+        const card = document.getElementById(`memory-card-${idx}`);
+        if(card && card.parentElement) card.parentElement.classList.add('flipped'); 
+    },
+    unflipMemoryCard(idx) { 
+        const card = document.getElementById(`memory-card-${idx}`);
+        if(card && card.parentElement) card.parentElement.classList.remove('flipped'); 
+    },
+    markMemoryMatched(idx1, idx2) { 
+        const card1 = document.getElementById(`memory-card-${idx1}`);
+        const card2 = document.getElementById(`memory-card-${idx2}`);
+        if(card1 && card1.parentElement) card1.parentElement.classList.add('matched'); 
+        if(card2 && card2.parentElement) card2.parentElement.classList.add('matched'); 
+    },
     
     renderAudio(data) {
         document.getElementById('btn-audio-listen').onclick = () => window.speakText(data.desc); const c = document.getElementById('audio-options-container'); c.innerHTML = ''; c.dataset.answer = data.answer;
@@ -211,9 +314,9 @@ export const uiManager = {
         const btn = document.getElementById('btn-record-read'); 
         btn.style.pointerEvents = 'auto';
         btn.className = "bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-10 rounded-full shadow-lg text-xl mx-auto flex items-center gap-3 transition-all duration-300"; 
-        document.getElementById('record-icon').innerText = "🎙️"; document.getElementById('record-text').innerText = "Start Recording";
+        document.getElementById('record-icon').innerText = "Record"; document.getElementById('record-text').innerText = "Start Recording";
         const status = document.getElementById('read-status-feedback');
-        if (status) { status.innerHTML = '<span class="text-slate-400">🎤 Ready to record</span>'; status.dataset.state = 'ready'; }
+        if (status) { status.innerHTML = '<span class="text-slate-400">Ready to record</span>'; status.dataset.state = 'ready'; }
         if(window.game && window.game.isRecordingReadAloud) window.game.stopReadAloud(true);
     },
     
@@ -227,7 +330,6 @@ export const uiManager = {
     showFinalResults(playersObj) {
         this.hideAll(); document.getElementById('module-12').classList.remove('hidden'); document.getElementById('game-status').classList.add('hidden'); document.getElementById('scoreboard-container').classList.add('hidden'); document.getElementById('wait-overlay').classList.add('hidden');
         
-        // Calculate Dynamic Team Winner
         let teamScores = {};
         appStore.get('teams').forEach(t => teamScores[t.id] = 0);
         Object.values(playersObj).forEach(p => { if(teamScores[p.team] !== undefined) teamScores[p.team] += p.scores?.total || 0; });
@@ -244,9 +346,9 @@ export const uiManager = {
                 const theme = animalThemes[winningTeams[0]] || animalThemes['eagle'];
                 const bgClass = tailwindColors[theme.color].heavy;
                 tw.className = `mb-10 rounded-xl p-6 text-white border-2 shadow-xl ${bgClass}`;
-                tw_text.innerHTML = `🏆 ${theme.icon} ${theme.name.toUpperCase()} TEAM WINS! (${maxScore} pts)`; 
+                tw_text.innerHTML = `TEAM WINS! (${maxScore} pts)`; 
             }
-            else { tw.className = `mb-10 rounded-xl p-6 text-white border-2 shadow-xl bg-slate-800`; tw_text.innerHTML = `⚖️ IT'S A TIE! (${maxScore} pts)`; }
+            else { tw.className = `mb-10 rounded-xl p-6 text-white border-2 shadow-xl bg-slate-800`; tw_text.innerHTML = `IT'S A TIE! (${maxScore} pts)`; }
         }
 
         const sorted = Object.values(playersObj).sort((a,b) => (b.scores?.total || 0) - (a.scores?.total || 0)); 
@@ -258,13 +360,14 @@ export const uiManager = {
             const theme = animalThemes[p.team] || animalThemes['eagle'];
             const tColorClass = tailwindColors[theme.color].text;
 
-            if(list) list.innerHTML += `<li class="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-200"><div class="flex items-center gap-4"><span class="font-bold text-slate-400 text-xl w-6">${i+1}.</span><div class="relative"><img src="${p.avatar}" class="w-12 h-12 rounded-full object-cover border-4 ${p.border || 'border-slate-300'} bg-white">${medal ? `<span class="absolute -bottom-2 -right-2 text-2xl drop-shadow">${medal}</span>` : ''}</div><div class="flex flex-col"><span class="font-bold text-slate-800 text-2xl leading-none">${p.name}</span><span class="text-xs font-bold uppercase ${tColorClass}">${theme.icon} ${theme.name} Team</span></div></div><span class="font-black text-indigo-600 text-3xl">${p.scores?.total || 0} pts</span></li>`; 
+            // 🔥 UPDATED: Added dark mode classes for leaderboard items 🔥
+            if(list) list.innerHTML += `<li class="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100"><div class="flex items-center gap-4"><span class="font-bold text-slate-400 text-xl w-6">${i+1}.</span><div class="relative"><img src="${p.avatar}" class="w-12 h-12 rounded-full object-cover border-4 ${p.border || 'border-slate-300'} bg-white">${medal ? `<span class="absolute -bottom-2 -right-2 text-2xl drop-shadow">${medal}</span>` : ''}</div><div class="flex flex-col"><span class="font-bold text-slate-800 dark:text-white text-2xl leading-none">${p.name}</span><span class="text-xs font-bold uppercase ${tColorClass}">${theme.name} Team</span></div></div><span class="font-black text-indigo-600 dark:text-indigo-400 text-3xl">${p.scores?.total || 0} pts</span></li>`; 
         });
         
         if(appStore.get('role') === 'student') {
             document.getElementById('student-personal-stats').classList.remove('hidden'); const bars = document.getElementById('student-skill-bars'); bars.innerHTML = '';
             const me = appStore.get('me');
-            ['Speaking', 'Writing', 'Listening', 'General'].forEach(sk => { const pts = me.scores[sk] || 0; bars.innerHTML += `<div><div class="flex justify-between text-sm font-bold text-slate-600 mb-1"><span>${sk}</span><span>${pts} pts</span></div><div class="w-full bg-slate-200 rounded-full h-3"><div class="bg-indigo-600 h-3 rounded-full" style="width: ${Math.min(100, Math.max(0, pts*10))}%"></div></div></div>`; });
+            ['Speaking', 'Writing', 'Listening', 'General'].forEach(sk => { const pts = me.scores[sk] || 0; bars.innerHTML += `<div><div class="flex justify-between text-sm font-bold text-slate-600 dark:text-slate-300 mb-1"><span>${sk}</span><span>${pts} pts</span></div><div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-3"><div class="bg-indigo-600 h-3 rounded-full" style="width: ${Math.min(100, Math.max(0, pts*10))}%"></div></div></div>`; });
         }
         
         const cv = document.getElementById('confetti-canvas'); 
