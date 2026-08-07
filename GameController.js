@@ -1,14 +1,12 @@
-// 🏗️ GameController.js
-// This file handles the core game loop, scoring, and module logic using the appStore Vault.
+// GameController.js
+// This file handles the core game loop, scoring, and triggering RPG progression events.
 
 import { appStore } from './store.js';
 
-// 🏗️ ENTERPRISE CONFIG: This defines the order of your game modules.
 const GameConfig = [
     { type: 'study', getTarget: () => null }, // Module 1
     { type: 'dnd', getTarget: (idx) => window.lessonData.vocabulary[idx] }, // Module 2
     { type: 'hotspot', getTarget: (idx) => window.lessonData.hotspots[idx] }, // Module 3
-    // 🔥 FIX: Explicitly target the memoryMatch array directly from the synced lesson data!
     { type: 'memory', getTarget: () => window.lessonData.memoryMatch }, // Module 4
     { type: 'audio', getTarget: (idx) => window.lessonData.audioGuess[idx] }, // Module 5
     { type: 'spelling', getTarget: (idx) => window.lessonData.spellingBee[idx] }, // Module 6
@@ -61,7 +59,6 @@ export const game = {
                 'study': () => { window.timerManager.stop(); window.uiManager.renderStudy(); },
                 'dnd': () => window.uiManager.renderDnD(targetData),
                 'hotspot': () => window.uiManager.renderHotspot(targetData),
-                // 🔥 FIX: Pass the targeted data dynamically into the init engine
                 'memory': () => this.initMemory(targetData),
                 'audio': () => window.uiManager.renderAudio(targetData),
                 'spelling': () => window.uiManager.renderSpelling(targetData),
@@ -80,103 +77,88 @@ export const game = {
     
     startTimer(sec) { window.timerManager.start(); },
     
+    // 🔥 CORE RPG ENGINE: This handles points, streaks, coins, and unlocks 🔥
     submitScore(points, skill, msg) {
         if(appStore.get('role') === 'host') { window.toast("Host test: " + msg, points > 0); window.uiManager.lockModule(); return; }
 
         window.timerManager.stop();
         let me = appStore.get('me');
         
-        // 🚀 GAMIFICATION ENGINE: Safely initialize schema properties if new
         me.xp = me.xp || 0;
         me.coins = me.coins || 0;
         me.streak = me.streak || 0;
+        me.maxStreak = me.maxStreak || 0;
         if (!me.scores) me.scores = { total: 0, General: 0, Listening: 0, Speaking: 0, Writing: 0 };
         if (typeof me.scores[skill] === 'undefined') me.scores[skill] = 0;
 
-        // 🔥 EXTRA LIFE CHECK 🔥
         if (points < 0 && me.inventory && me.inventory.extraLife > 0) {
-            // Consume Extra Life locally
             me.inventory.extraLife -= 1;
             appStore.set('me', me);
             
-            // Sync to Firebase directly
             if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
                 const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/extraLife`);
                 window.firebaseSet(userRef, me.inventory.extraLife);
             }
 
-            // Prevent penalty
             points = 0;
-            msg = "🛡️ Saved by Extra Life!";
+            msg = "Saved by Extra Life!";
             window.toast(msg, true);
             window.sfx.play('correct'); 
             
-            // Re-render dashboard locker silently in background
             if (window.dashboardController) window.dashboardController.renderDashboard();
         } 
-        // 🚀 GAMIFICATION ENGINE: Rewards & Economy Calculation
         else if(points > 0) {
             window.sfx.play('correct');
             me.streak++; 
+            if (me.streak > me.maxStreak) me.maxStreak = me.streak; // Track lifetime best streak for Trophies!
             
-            // Base Economy Math
             let earnedXP = points * 10;
             let earnedCoins = points * 5;
 
-            // Engagement / Streak Multipliers
             if(window.timerManager.timeLeft >= 50) {
                 window.toast("Lightning Fast! +15 XP", true);
                 earnedXP += 15;
             }
             if(me.streak === 2) {
-                window.toast("Two in a row! 🔥", true);
+                window.toast("Two in a row!", true);
                 earnedXP += 20;
             }
             if(me.streak >= 3) {
-                window.toast(`Unstoppable! ${me.streak} Streak! 🪙`, true);
+                window.toast(`Unstoppable! ${me.streak} Streak!`, true);
                 earnedXP += 50;
-                earnedCoins += 10; // Bonus economy for high engagement
+                earnedCoins += 10; 
             }
 
-            // 🔥 DOUBLE COINS LOGIC 🔥
             if (me.inventory && me.inventory.doubleCoins > 0) {
-                // Apply the multiplier and decrement the item
                 earnedCoins *= 2;
                 me.inventory.doubleCoins -= 1;
-                window.toast("🪙 Double Coins Active! Earnings Multiplied!", true);
+                window.toast("Double Coins Active! Earnings Multiplied!", true);
                 
-                // Sync doubleCoins inventory decrement directly to Firebase
                 if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
                     const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/doubleCoins`);
                     window.firebaseSet(userRef, me.inventory.doubleCoins);
                 }
-                
-                // Refresh dashboard to visually update the inventory locker count
-                if (window.dashboardController) window.dashboardController.renderDashboard();
             }
 
-            // Award to profile
             me.xp += earnedXP;
             me.coins += earnedCoins;
             window.uiManager.showProfChat();
         } else {
             window.sfx.play('wrong');
-            me.streak = 0; // Break streak
+            me.streak = 0; 
         }
         
-        // Granular Performance Tracking
         me.scores.total += points; 
         me.scores[skill] += points; 
         appStore.set('me', me);
         
-        // 🚀 GAMIFICATION ENGINE: Persist Everything to Firebase
         if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
             const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}`);
-            // Pushing the whole 'me' object securely updates scores, streak, xp, and coins in one go!
             window.firebaseSet(userRef, me);
         }
 
         window.uiManager.updateStudentHUD();
+        if (window.dashboardController) window.dashboardController.renderDashboard(); // Re-render to show quest progress instantly
 
         const hostConn = appStore.get('hostConn');
         if(hostConn) hostConn.send({ type: 'SCORE_UPDATE', id: appStore.get('peer').id, points, skill });
@@ -194,15 +176,12 @@ export const game = {
     handleDnDMatch(isMatch) { if(isMatch) this.submitScore(3, "General", "Matched!"); else this.submitScore(-1, "General", "Missed!"); },
     handleHotspot(isHit) { if(isHit) this.submitScore(3, "General", "Found it!"); else this.submitScore(-1, "General", "Missed!"); },
     
-    // 🔥 ENGINE UPGRADE: Injects the synced data directly, bypassing local null states 🔥
     initMemory(targetData) {
         let cards = []; 
-        let memData = targetData || window.lessonData?.memoryMatch || [];
+        let memData = (targetData && targetData.length > 0) ? targetData : (window.lessonData?.memoryMatch || []);
         const memType = window.lessonData?.memoryMatchType || 'text-text';
 
-        // 🔥 CRITICAL FIX: If Professor data didn't sync correctly to the student, force fallback data so the screen is never blank!
         if (!memData || memData.length === 0) {
-            console.warn("Memory Match data missing or empty! Loading default fallbacks to prevent crash.");
             memData = [
                 { term: "Connection", match: "Link" },
                 { term: "Database", match: "Storage" },
@@ -215,7 +194,6 @@ export const game = {
             let termContent = v.term || "?";
             let matchContent = v.match || "?";
 
-            // Dynamically build image tags based on the selected mode with graceful fallbacks
             if (memType === 'image-text') {
                 termContent = v.termImg ? `<img src="${v.termImg}" alt="Card Image" class="w-full h-full object-cover rounded-lg">` : (v.term || "No Image");
                 matchContent = v.match || "No Text";
@@ -237,7 +215,6 @@ export const game = {
         
         appStore.set('localGameData', localGameData);
         
-        // Slight delay ensures the DOM is un-hidden before rendering the cards
         setTimeout(() => {
             if(window.uiManager && typeof window.uiManager.renderMemoryGrid === 'function') {
                 window.uiManager.renderMemoryGrid(localGameData.memCards); 
@@ -260,7 +237,6 @@ export const game = {
             if (d.memCards[idx1].id === d.memCards[idx2].id) {
                 d.memMatched++;
                 if(appStore.get('role') !== 'host') {
-                    // Force the score via submitScore to trigger economy logic
                     this.submitScore(3, "General", "Memory Match!");
                     window.uiManager.markMemoryMatched(idx1, idx2);
                 } else {
@@ -325,7 +301,7 @@ export const game = {
         appStore.set('localGameData', d);
     },
 
-    handleWallyClick(isHit) { if(isHit) this.submitScore(3, "General", "Found Wally!"); else this.submitScore(-1, "General", "Missed!"); },
+    handleWallyClick(isHit) { if(isHit) this.submitScore(3, "General", "Found!"); else this.submitScore(-1, "General", "Missed!"); },
     
     toggleReadAloud(forceCancel = false) {
         if (this.isRecordingReadAloud || forceCancel) {

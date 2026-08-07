@@ -1,4 +1,5 @@
-// 🏗️ Prof Dashboard (Strict Dual-Mode Framework: Crisp Light / Glass Dark)
+// ProfDashboard.js
+// Strict Dual-Mode Framework: Crisp Light / Glass Dark
 
 export class ProfDashboard extends HTMLElement {
     
@@ -9,7 +10,6 @@ export class ProfDashboard extends HTMLElement {
     render() {
         this.innerHTML = `
             <style>
-                /* Custom Webkit Scrollbars for a sleek UI */
                 ::-webkit-scrollbar {
                     width: 6px;
                     height: 6px;
@@ -18,17 +18,16 @@ export class ProfDashboard extends HTMLElement {
                     background: transparent;
                 }
                 ::-webkit-scrollbar-thumb {
-                    background-color: #818cf8; /* Light Mode: Soft Indigo */
+                    background-color: #818cf8; 
                     border-radius: 10px;
                 }
                 .dark ::-webkit-scrollbar-thumb {
-                    background-color: rgba(99,102,241,0.5); /* Dark Mode: Glassy Indigo */
+                    background-color: rgba(99,102,241,0.5); 
                 }
                 ::-webkit-scrollbar-thumb:hover {
                     background-color: #6366f1;
                 }
 
-                /* Admin Team List */
                 #admin-team-list > div {
                     background-color: #f8fafc !important; 
                     border: 1px solid #e2e8f0 !important; 
@@ -40,13 +39,12 @@ export class ProfDashboard extends HTMLElement {
                     transition: all 0.3s ease;
                 }
                 .dark #admin-team-list > div {
-                    background-color: rgba(0, 0, 0, 0.2) !important; 
-                    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+                    background-color: rgba(30, 41, 59, 0.8) !important; 
+                    border: 1px solid rgba(255, 255, 255, 0.1) !important;
                     color: #f1f5f9 !important;
                 }
                 .dark #admin-team-list > div span, .dark #admin-team-list > div div { color: #f1f5f9 !important; }
                 
-                /* Student Management List */
                 #student-management-list > div {
                     background-color: #f8fafc !important; 
                     border: 1px solid #e2e8f0 !important; 
@@ -57,7 +55,7 @@ export class ProfDashboard extends HTMLElement {
                     transition: all 0.3s ease;
                 }
                 .dark #student-management-list > div {
-                    background-color: rgba(0, 0, 0, 0.15) !important;
+                    background-color: rgba(30, 41, 59, 0.8) !important;
                     border: 1px solid rgba(255, 255, 255, 0.1) !important;
                     color: #f1f5f9 !important;
                     box-shadow: none !important;
@@ -65,18 +63,17 @@ export class ProfDashboard extends HTMLElement {
                 .dark #student-management-list > div h4, 
                 .dark #student-management-list > div p { color: #f1f5f9 !important; }
                 
-                #student-management-list span {
+                #student-management-list span.phone-badge {
                     background-color: #e2e8f0 !important;
                     color: #475569 !important;
                     border: none !important;
                     transition: all 0.3s ease;
                 }
-                .dark #student-management-list span {
+                .dark #student-management-list span.phone-badge {
                     background-color: rgba(255, 255, 255, 0.1) !important;
                     color: #cbd5e1 !important;
                 }
                 
-                /* Mod 3 & 8 Lists */
                 #admin-mod3-list > div,
                 #admin-mod8-list > div {
                     background-color: #f8fafc !important;
@@ -94,7 +91,6 @@ export class ProfDashboard extends HTMLElement {
                     color: #f8fafc !important;
                 }
 
-                /* Inputs & Selects */
                 #student-management-list input,
                 #student-management-list select,
                 #admin-content-editors input,
@@ -129,10 +125,9 @@ export class ProfDashboard extends HTMLElement {
                     color: #94a3b8 !important;
                 }
 
-                /* 🔥 NEW: Force Native Dropdowns to be Dark in Dark Mode 🔥 */
                 .dark select option, .dark select optgroup {
-                    background-color: #1e293b !important; /* Tailwind slate-800 */
-                    color: #f1f5f9 !important; /* Tailwind slate-100 */
+                    background-color: #1e293b !important;
+                    color: #f1f5f9 !important;
                 }
             </style>
 
@@ -141,7 +136,7 @@ export class ProfDashboard extends HTMLElement {
                 <aside class="w-16 md:w-64 bg-slate-50 dark:bg-transparent border-r border-slate-200 dark:border-white/10 p-4 md:p-6 flex flex-col justify-between z-20 transition-all duration-300 shrink-0 sticky top-8 h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar">
                     <div>
                         <div class="flex items-center gap-3 mb-10 overflow-hidden">
-                            <div class="min-w-[40px] h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-black text-lg transition-colors duration-300">⚡</div>
+                            <div class="min-w-[40px] h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-black text-lg transition-colors duration-300">&#9889;</div>
                             <div class="hidden md:block">
                                 <h1 class="font-bold text-sm text-slate-900 dark:text-white tracking-widest uppercase transition-colors duration-300">Command Hub</h1>
                                 <span class="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-0.5 transition-colors duration-300"><span class="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-pulse"></span> Live</span>
@@ -150,13 +145,13 @@ export class ProfDashboard extends HTMLElement {
 
                         <nav class="space-y-2">
                             <button onclick="adminUI.switchTab('lobby')" id="tab-lobby" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 font-medium text-sm transition-all duration-300">
-                                <span class="text-lg">🛠️</span> <span class="hidden md:block whitespace-nowrap">Lobby & Modules</span>
+                                <span class="text-lg">&#128736;</span> <span class="hidden md:block whitespace-nowrap">Lobby & Modules</span>
                             </button>
                             <button onclick="adminUI.switchTab('analytics')" id="tab-analytics" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium text-sm transition-all duration-300">
-                                <span class="text-lg">📊</span> <span class="hidden md:block whitespace-nowrap">Live Analytics</span>
+                                <span class="text-lg">&#128202;</span> <span class="hidden md:block whitespace-nowrap">Live Analytics</span>
                             </button>
                             <button onclick="adminUI.switchTab('settings')" id="tab-settings" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium text-sm transition-all duration-300">
-                                <span class="text-lg">⚙️</span> <span class="hidden md:block whitespace-nowrap">Room Settings</span>
+                                <span class="text-lg">&#9881;</span> <span class="hidden md:block whitespace-nowrap">Room Settings</span>
                             </button>
                         </nav>
                     </div>
@@ -217,7 +212,7 @@ export class ProfDashboard extends HTMLElement {
                             
                             <div class="xl:col-span-2 space-y-6">
                                 <button onclick="adminUI.saveContent()" class="w-full bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all duration-300 text-lg flex items-center justify-center gap-2">
-                                    💾 Save All Lesson Changes
+                                    &#128190; Save All Lesson Changes
                                 </button>
                                 
                                 <div class="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm dark:shadow-none transition-colors duration-300">
@@ -267,9 +262,9 @@ export class ProfDashboard extends HTMLElement {
                                         <button onclick="adminUI.addItem('memoryMatch')" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">Add +</button>
                                     </div>
                                     <select id="mod4-match-type" onchange="adminUI.renderContentEditors()" class="w-full mb-3 p-2 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 text-sm focus:border-indigo-500 transition-colors duration-300 text-slate-900 dark:text-slate-200">
-                                        <option value="text-text">📝 Text to Text</option>
-                                        <option value="image-text">🖼️ Image to Text</option>
-                                        <option value="image-image">📸 Image to Image</option>
+                                        <option value="text-text">&#128221; Text to Text</option>
+                                        <option value="image-text">&#128444; Image to Text</option>
+                                        <option value="image-image">&#128248; Image to Image</option>
                                     </select>
                                     <div id="admin-memory-list" class="space-y-3"></div>
                                 </div>
@@ -326,7 +321,7 @@ export class ProfDashboard extends HTMLElement {
                             </div>
                             <div class="bg-slate-50 dark:bg-slate-800/40 dark:backdrop-blur-md border border-slate-200 dark:border-white/10 p-6 rounded-3xl transition-colors duration-300 shadow-sm dark:shadow-none">
                                 <h3 class="font-medium text-slate-900 dark:text-slate-200 mb-4 text-center tracking-wider uppercase text-sm transition-colors duration-300">Detailed Stats</h3>
-                                <div id="analytics-player-list" class="space-y-3 max-h-64 overflow-y-auto"></div>
+                                <div id="analytics-player-list" class="space-y-3 max-h-64 overflow-y-auto pr-2"></div>
                             </div>
                         </div>
                         
@@ -341,11 +336,11 @@ export class ProfDashboard extends HTMLElement {
                                 </button>
                                 
                                 <button onclick="adminUI.exitToLobby()" id="btn-end-session" class="bg-rose-600 hover:bg-rose-700 text-white font-medium py-3 px-8 rounded-xl shadow-md transition-all duration-300">
-                                    🛑 Return to Dashboard Lobby
+                                    &#128689; Return to Dashboard Lobby
                                 </button>
 
                                 <button onclick="adminUI.restartSession()" id="btn-restart-session" class="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-medium py-3 px-8 rounded-xl shadow-md transition-all duration-300">
-                                    🔄 Restart Session
+                                    &#128260; Restart Session
                                 </button>
                             </div>
                         </div>
@@ -353,7 +348,6 @@ export class ProfDashboard extends HTMLElement {
 
                     <div id="admin-tab-settings" class="hidden space-y-10">
                         
-                        <!-- 🔥 Secure Credential Updates UI 🔥 -->
                         <div class="bg-transparent w-full">
                             <h3 class="font-medium text-slate-800 dark:text-slate-200 mb-4 text-sm tracking-wider uppercase border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">Secure Credential Update</h3>
                             
@@ -377,19 +371,12 @@ export class ProfDashboard extends HTMLElement {
                             </div>
                         </div>
 
+                        <!-- 🔥 NEW: Custom Team Creation UI 🔥 -->
                         <div class="bg-transparent w-full max-w-xl">
-                            <h3 class="font-medium text-slate-800 dark:text-slate-200 mb-4 text-sm tracking-wider uppercase border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">Manage Animal Teams</h3>
-                            <div class="flex gap-3 mb-4">
-                                <select id="new-team-animal" class="p-2.5 rounded-lg w-full bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 font-light text-sm text-slate-900 dark:text-slate-200 transition-colors duration-300">
-                                    <option value="lion">🦁 Lions</option>
-                                    <option value="eagle">🦅 Eagles</option>
-                                    <option value="wolf">🐺 Wolves</option>
-                                    <option value="shark">🦈 Sharks</option>
-                                    <option value="tiger">🐯 Tigers</option>
-                                    <option value="bear">🐻 Bears</option>
-                                    <option value="dragon">🐉 Dragons</option>
-                                    <option value="panda">🐼 Pandas</option>
-                                </select>
+                            <h3 class="font-medium text-slate-800 dark:text-slate-200 mb-4 text-sm tracking-wider uppercase border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">Manage Custom Teams</h3>
+                            <div class="flex gap-2 w-full mb-4">
+                                <input type="text" id="new-team-icon" placeholder="&#128526;" class="w-16 p-2.5 rounded-lg text-center bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 font-medium text-lg text-slate-900 dark:text-slate-200 transition-colors duration-300" maxlength="2">
+                                <input type="text" id="new-team-name" placeholder="Enter Team Name..." class="flex-1 p-2.5 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 font-medium text-sm text-slate-900 dark:text-slate-200 transition-colors duration-300">
                                 <button onclick="adminUI.addTeam()" class="bg-indigo-600 dark:bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white px-6 py-2.5 rounded-lg font-medium shadow-md transition-colors duration-300 text-sm">Add</button>
                             </div>
                             <div id="admin-team-list" class="max-h-48 overflow-y-auto pr-2"></div>
@@ -398,10 +385,9 @@ export class ProfDashboard extends HTMLElement {
                         <div class="bg-transparent w-full">
                             <h3 class="font-medium text-slate-800 dark:text-slate-200 mb-6 text-sm tracking-wider uppercase flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">
                                 Student Roster Management
-                                <button onclick="adminUI.renderStudentManagement()" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">↻ Refresh</button>
+                                <button onclick="adminUI.renderStudentManagement()" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">&#8635; Refresh</button>
                             </h3>
                             
-                            <!-- 🔥 NEW: Pending Approval Queue Wrapper 🔥 -->
                             <div id="pending-approvals-wrapper" class="hidden mb-6">
                                 <h4 class="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Requires Approval</h4>
                                 <div id="pending-approvals-list" class="space-y-3"></div>
@@ -425,77 +411,6 @@ export class ProfDashboard extends HTMLElement {
                                                 <option value="+1">CA +1</option>
                                                 <option value="+52">MX +52</option>
                                                 <option value="+1">US +1</option>
-                                            </optgroup>
-                                            <optgroup label="Latin America & Caribbean">
-                                                <option value="+54">AR +54</option>
-                                                <option value="+591">BO +591</option>
-                                                <option value="+55">BR +55</option>
-                                                <option value="+501">BZ +501</option>
-                                                <option value="+56">CL +56</option>
-                                                <option value="+57">CO +57</option>
-                                                <option value="+506">CR +506</option>
-                                                <option value="+53">CU +53</option>
-                                                <option value="+1">DO +1</option>
-                                                <option value="+593">EC +593</option>
-                                                <option value="+502">GT +502</option>
-                                                <option value="+504">HN +504</option>
-                                                <option value="+509">HT +509</option>
-                                                <option value="+1">JM +1</option>
-                                                <option value="+505">NI +505</option>
-                                                <option value="+507">PA +507</option>
-                                                <option value="+51">PE +51</option>
-                                                <option value="+595">PY +595</option>
-                                                <option value="+503">SV +503</option>
-                                                <option value="+598">UY +598</option>
-                                                <option value="+58">VE +58</option>
-                                            </optgroup>
-                                            <optgroup label="Europe">
-                                                <option value="+376">AD +376</option>
-                                                <option value="+355">AL +355</option>
-                                                <option value="+43">AT +43</option>
-                                                <option value="+387">BA +387</option>
-                                                <option value="+32">BE +32</option>
-                                                <option value="+359">BG +359</option>
-                                                <option value="+375">BY +375</option>
-                                                <option value="+41">CH +41</option>
-                                                <option value="+357">CY +357</option>
-                                                <option value="+420">CZ +420</option>
-                                                <option value="+49">DE +49</option>
-                                                <option value="+45">DK +45</option>
-                                                <option value="+372">EE +372</option>
-                                                <option value="+34">ES +34</option>
-                                                <option value="+358">FI +358</option>
-                                                <option value="+33">FR +33</option>
-                                                <option value="+44">GB +44</option>
-                                                <option value="+30">GR +30</option>
-                                                <option value="+385">HR +385</option>
-                                                <option value="+36">HU +36</option>
-                                                <option value="+353">IE +353</option>
-                                                <option value="+354">IS +354</option>
-                                                <option value="+39">IT +39</option>
-                                                <option value="+423">LI +423</option>
-                                                <option value="+370">LT +370</option>
-                                                <option value="+352">LU +352</option>
-                                                <option value="+371">LV +371</option>
-                                                <option value="+377">MC +377</option>
-                                                <option value="+373">MD +373</option>
-                                                <option value="+382">ME +382</option>
-                                                <option value="+389">MK +389</option>
-                                                <option value="+356">MT +356</option>
-                                                <option value="+31">NL +31</option>
-                                                <option value="+47">NO +47</option>
-                                                <option value="+48">PL +48</option>
-                                                <option value="+351">PT +351</option>
-                                                <option value="+40">RO +40</option>
-                                                <option value="+381">RS +381</option>
-                                                <option value="+7">RU +7</option>
-                                                <option value="+46">SE +46</option>
-                                                <option value="+386">SI +386</option>
-                                                <option value="+421">SK +421</option>
-                                                <option value="+378">SM +378</option>
-                                                <option value="+380">UA +380</option>
-                                                <option value="+379">VA +379</option>
-                                                <option value="+383">XK +383</option>
                                             </optgroup>
                                         </select>
                                         <input type="tel" id="manual-student-phone" placeholder="Phone" class="w-full p-2.5 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 font-light text-sm text-slate-900 dark:text-white transition-colors duration-300">

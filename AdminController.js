@@ -29,6 +29,18 @@ export const adminUI = {
         this.updateLobbyList();
     },
 
+    // 🔥 NEW: Unified Team Helper to support both Legacy and Custom Teams seamlessly 🔥
+    getTeamDetails(teamId) {
+        const customTeams = appStore.get('teams') || [];
+        const found = customTeams.find(t => t.id === teamId);
+        if (found) return found;
+        
+        const legacy = animalThemes && animalThemes[teamId] ? animalThemes[teamId] : null;
+        if (legacy) return { id: teamId, name: legacy.name, icon: legacy.icon || '&#128305;', color: legacy.color };
+        
+        return { id: teamId, name: teamId, icon: '&#128305;', color: 'blue' };
+    },
+
     deleteItem(type, index) {
         if (!window.lessonData) return;
         
@@ -253,34 +265,48 @@ export const adminUI = {
         const teams = appStore.get('teams') || [];
         
         if(list) {
-            list.innerHTML = teams.map((t, i) => `
+            list.innerHTML = teams.map((t, i) => {
+                const themeInfo = this.getTeamDetails(t.id);
+                return `
                 <div class="flex justify-between items-center bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-white/10 rounded">
                     <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded-full ${tailwindColors[animalThemes[t.id].color].bg}"></div>
-                        <span class="font-bold text-slate-800 dark:text-white">${animalThemes[t.id].name}</span>
+                        <span class="text-xl">${themeInfo.icon}</span>
+                        <span class="font-bold text-slate-800 dark:text-white">${themeInfo.name}</span>
                     </div>
                     <button onclick="adminUI.deleteTeam(${i})" class="text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 px-2 rounded font-bold">X</button>
-                </div>`).join('');
+                </div>`
+            }).join('');
         }
 
         if(manualTeamSelect) {
             manualTeamSelect.innerHTML = `<option value="random">Random Team</option>` + 
-                teams.map(t => `<option value="${t.id}">${animalThemes[t.id].name}</option>`).join('');
+                teams.map(t => `<option value="${t.id}">${this.getTeamDetails(t.id).name}</option>`).join('');
         }
         this.updateTeamScores(); 
     },
     
     addTeam() {
-        const animalId = document.getElementById('new-team-animal').value;
+        const iconInput = document.getElementById('new-team-icon').value.trim() || '&#128305;';
+        const nameInput = document.getElementById('new-team-name').value.trim();
+        
+        if(!nameInput) return window.toast("Please enter a team name.", false);
+
+        const teamId = 'team_' + Date.now();
+        const tailwindColorOptions = ['red', 'blue', 'green', 'yellow', 'purple', 'pink', 'indigo', 'cyan', 'emerald', 'rose'];
+        const randomColor = tailwindColorOptions[Math.floor(Math.random() * tailwindColorOptions.length)];
+
         const teams = appStore.get('teams') || [];
-        if(!teams.find(t => t.id === animalId)) {
-            const updatedTeams = [...teams, {id: animalId}];
-            appStore.set('teams', updatedTeams);
-            authManager.saveDB(updatedTeams, 'teams');
-            this.renderTeams(); this.renderStudentManagement();
-        } else {
-            window.toast("Team already exists!", false);
-        }
+        const updatedTeams = [...teams, { id: teamId, icon: iconInput, name: nameInput, color: randomColor }];
+        
+        appStore.set('teams', updatedTeams);
+        authManager.saveDB(updatedTeams, 'teams');
+        
+        document.getElementById('new-team-icon').value = '';
+        document.getElementById('new-team-name').value = '';
+        
+        this.renderTeams(); 
+        this.renderStudentManagement();
+        window.toast(`Custom team created successfully!`, true);
     },
     
     deleteTeam(index) {
@@ -340,6 +366,44 @@ export const adminUI = {
         } catch (error) { window.toast(`Registration failed: ${error.message}`, false); }
     },
 
+    async giftItem(phone) {
+        const giftSelect = document.getElementById(`gift-item-${phone}`);
+        const item = giftSelect.value;
+        if (!item) return window.toast("Please select an item to gift first.", false);
+        
+        const db = await authManager.getDB('students');
+        const student = db[phone];
+        
+        if (!student) return window.toast("Student not found in database.", false);
+
+        if (student.uid && window.firebaseRef && window.firebaseSet && window.firebaseDB && window.firebaseGet) {
+            try {
+                const userRef = window.firebaseRef(window.firebaseDB, `users/${student.uid}`);
+                const snapshot = await window.firebaseGet(userRef);
+                
+                if (snapshot.exists()) {
+                    let globalData = snapshot.val();
+                    if (item === 'coins_50') {
+                        globalData.coins = (globalData.coins || 0) + 50;
+                    } else {
+                        globalData.inventory = globalData.inventory || {};
+                        globalData.inventory[item] = (globalData.inventory[item] || 0) + 1;
+                    }
+                    await window.firebaseSet(userRef, globalData);
+                    window.toast(`Gift sent directly to ${student.name}'s live account!`, true);
+                    giftSelect.selectedIndex = 0; 
+                } else {
+                    window.toast("Student profile not fully generated. Have them log in first.", false);
+                }
+            } catch(e) {
+                console.error("Gifting sync failed", e);
+                window.toast("Failed to connect to Firebase for live gifting.", false);
+            }
+        } else {
+            window.toast("Missing student UID for live gifting.", false);
+        }
+    },
+
     renderStudentManagement() {
         const dbPromise = authManager.getDB('students'); 
         const pendingContainer = document.getElementById('pending-approvals-list');
@@ -374,32 +438,48 @@ export const adminUI = {
                 } else {
                     if(container) {
                         container.innerHTML += `
-                        <div class="flex flex-col sm:flex-row items-center gap-4 p-4 border border-slate-200 dark:border-white/10 rounded bg-white dark:bg-slate-800/40 shadow-sm mb-3">
+                        <div class="flex flex-col sm:flex-row items-start gap-4 p-4 border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-slate-800/80 shadow-sm mb-3 transition-all">
+                            
                             <div class="relative w-16 h-16 shrink-0 transition-transform hover:scale-105">
                                 <img src="${s.avatar}" id="edit-img-${phone}" class="w-full h-full rounded-full object-cover border border-slate-300">
                                 <input type="file" accept="image/*" onchange="adminUI.updateStudentAvatar(event, '${phone}')" class="absolute inset-0 opacity-0 cursor-pointer" title="Update Profile Photo">
                             </div>
+                            
                             <div class="flex-1 w-full flex flex-col gap-1">
                                 <div class="flex justify-between items-start">
                                     <p class="font-bold text-slate-800 dark:text-white text-lg">${s.name}</p>
-                                    <span class="text-xs font-mono bg-slate-100 dark:bg-black/30 px-2 py-1 rounded text-slate-500 dark:text-slate-400">${phone}</span>
+                                    <span class="phone-badge text-xs font-mono px-2 py-1 rounded-md">${phone}</span>
                                 </div>
+                                
                                 <div class="flex gap-4 mt-2">
                                     <div class="flex-1">
                                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">New Password</label>
-                                        <input type="text" id="edit-pass-${phone}" placeholder="Reset Password..." class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white">
+                                        <input type="text" id="edit-pass-${phone}" placeholder="Reset Password..." class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded-lg w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white transition-colors">
                                     </div>
                                     <div class="flex-1">
                                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Assign Team</label>
-                                        <select id="edit-team-${phone}" class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white">
-                                            ${teams.map(t => `<option value="${t.id}" ${s.team === t.id ? 'selected' : ''}>${animalThemes[t.id]?.name || t.id}</option>`).join('')}
+                                        <select id="edit-team-${phone}" class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded-lg w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white transition-colors">
+                                            ${teams.map(t => `<option value="${t.id}" ${s.team === t.id ? 'selected' : ''}>${this.getTeamDetails(t.id).name}</option>`).join('')}
                                         </select>
                                     </div>
                                 </div>
+
+                                <div class="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-white/10 w-full">
+                                    <select id="gift-item-${phone}" class="flex-1 p-2 text-sm rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-200 focus:outline-none transition-colors">
+                                        <option value="" disabled selected>Select a Gift...</option>
+                                        <option value="extraLife">&#128305; Extra Life</option>
+                                        <option value="freezeTime">&#10052; Time Freeze</option>
+                                        <option value="timeBurn">&#128293; Time Burn</option>
+                                        <option value="doubleCoins">&#129689; Double Coins</option>
+                                        <option value="coins_50">&#128176; +50 Coins immediately</option>
+                                    </select>
+                                    <button onclick="adminUI.giftItem('${phone}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors w-full sm:w-auto">&#127873; Send Gift</button>
+                                </div>
                             </div>
-                            <div class="flex gap-2 w-full sm:w-auto mt-3 sm:mt-0 self-end">
-                                <button onclick="adminUI.saveStudentEdit('${phone}')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Save</button>
-                                <button onclick="adminUI.deleteStudent('${phone}', false)" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Delete</button>
+                            
+                            <div class="flex flex-col gap-2 w-full sm:w-auto mt-3 sm:mt-0">
+                                <button onclick="adminUI.saveStudentEdit('${phone}')" class="w-full bg-slate-800 hover:bg-slate-900 dark:bg-white/10 dark:hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">Save Edits</button>
+                                <button onclick="adminUI.deleteStudent('${phone}', false)" class="w-full bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">Delete</button>
                             </div>
                         </div>`;
                     }
@@ -505,22 +585,21 @@ export const adminUI = {
         const sortedPlayers = Object.values(players).sort((a, b) => (b.scores?.total || 0) - (a.scores?.total || 0));
 
         sortedPlayers.forEach(p => { 
-            const theme = animalThemes[p.team] || animalThemes['eagle'];
-            const badgeColor = tailwindColors[theme.color].bg;
+            const theme = this.getTeamDetails(p.team);
+            const badgeColor = tailwindColors[theme.color]?.bg || 'bg-indigo-500';
             const score = p.scores?.total || 0;
             
-            // 🔥 UPDATED: Added dark mode classes for professor lobby student list items 🔥
             list.innerHTML += `
-                <li class="flex items-center justify-between p-3 bg-white dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-white/10 mb-2 shadow-sm transition-all text-slate-800 dark:text-slate-100">
+                <li class="flex items-center justify-between p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-white/10 mb-2 shadow-sm transition-all text-slate-800 dark:text-slate-100">
                     <div class="flex items-center gap-3">
-                        <img src="${p.avatar}" class="w-10 h-10 rounded-full border-2 ${p.border || 'border-slate-300'} bg-white object-cover">
+                        <img src="${p.avatar}" class="w-10 h-10 rounded-full border-2 ${p.border || 'border-slate-300'} bg-white dark:bg-slate-700 object-cover">
                         <div class="flex flex-col">
                             <span class="font-bold text-slate-800 dark:text-white text-sm leading-tight">${p.name}</span>
                             <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">${p.phone || 'Student'}</span>
                         </div>
                     </div>
                     <div class="flex flex-col items-end gap-1">
-                        <span class="text-xs font-bold text-white px-2 py-1 rounded-full ${badgeColor}">${theme.name} Team</span>
+                        <span class="text-xs font-bold text-white px-2 py-1 rounded-full shadow-sm ${badgeColor}">${theme.icon} ${theme.name}</span>
                         <span class="text-xs font-black text-indigo-600 dark:text-indigo-400 text-right w-full">${score} pts</span>
                     </div>
                 </li>
@@ -538,15 +617,15 @@ export const adminUI = {
         teams.forEach(t => {
             let score = 0;
             Object.values(players).forEach(p => { if(p.team === t.id) score += p.scores?.total || 0; });
-            const theme = animalThemes[t.id];
-            const bgClass = tailwindColors[theme.color].bg;
-            const txtClass = tailwindColors[theme.color].light;
+            const theme = this.getTeamDetails(t.id);
+            const bgClass = tailwindColors[theme.color]?.bg || 'bg-indigo-500';
+            const txtClass = tailwindColors[theme.color]?.light || 'text-indigo-200';
             
             html += `
-            <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3 border-2 border-slate-700 shadow-md">
+            <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3 border-2 border-slate-700 shadow-md transition-all">
                 <div class="w-3 h-12 rounded-full ${bgClass}"></div>
                 <div>
-                    <p class="${txtClass} font-bold text-[10px] tracking-widest uppercase">${theme.name}</p>
+                    <p class="${txtClass} font-bold text-[10px] tracking-widest uppercase truncate max-w-[100px]">${theme.icon} ${theme.name}</p>
                     <p class="text-white font-black text-2xl leading-none">${score}</p>
                 </div>
             </div>`;
@@ -563,11 +642,22 @@ export const adminUI = {
         l.innerHTML = '';
         
         players.sort((a,b)=>(b.scores?.total || 0) - (a.scores?.total || 0)).forEach(p => { 
-            const theme = animalThemes[p.team] || animalThemes['eagle'];
-            const bgClass = tailwindColors[theme.color].bg;
+            const theme = this.getTeamDetails(p.team);
+            const bgClass = tailwindColors[theme.color]?.bg || 'bg-indigo-500';
             
-            // 🔥 UPDATED: Added dark mode classes for analytics detailed stats items 🔥
-            l.innerHTML += `<div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800/60 p-2 rounded border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full ${bgClass}"></div><span class="font-bold text-slate-800 dark:text-white">${p.name}</span></div><div class="flex gap-3 text-xs"><span class="text-green-600 dark:text-green-400">Spk: ${p.scores?.Speaking||0}</span><span class="text-blue-600 dark:text-blue-400">Wrt: ${p.scores?.Writing||0}</span><span class="text-purple-600 dark:text-purple-400">Lst: ${p.scores?.Listening||0}</span><span class="font-black text-indigo-800 dark:text-indigo-300">Tot: ${p.scores?.total||0}</span></div></div>`; 
+            l.innerHTML += `
+            <div class="flex justify-between items-center bg-white dark:bg-slate-800/80 p-3 rounded-lg border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100 mb-2 shadow-sm transition-colors">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full ${bgClass} shadow-sm"></div>
+                    <span class="font-bold text-slate-800 dark:text-white">${p.name}</span>
+                </div>
+                <div class="flex gap-3 text-xs font-semibold">
+                    <span class="text-rose-600 dark:text-rose-400">Spk: ${p.scores?.Speaking||0}</span>
+                    <span class="text-blue-600 dark:text-blue-400">Wrt: ${p.scores?.Writing||0}</span>
+                    <span class="text-emerald-600 dark:text-emerald-400">Lst: ${p.scores?.Listening||0}</span>
+                    <span class="font-black text-indigo-800 dark:text-indigo-300">Tot: ${p.scores?.total||0}</span>
+                </div>
+            </div>`; 
         });
         
         const ctxEl = document.getElementById('classRadarChart');
