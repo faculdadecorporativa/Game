@@ -3,17 +3,19 @@
 
 export const databaseJanitor = {
     async runCleanup() {
-        console.log("🧹 Professor Janitor: Checking for old data...");
+        console.group("%c🧹 Professor Janitor: Maintenance Routine", "color: #10b981; font-size: 14px; font-weight: bold;");
+        console.log("Checking for expired rooms and inactive legacy data...");
+        
         const now = Date.now();
         
         // Time thresholds defined in milliseconds
         const ONE_DAY_MS = 24 * 60 * 60 * 1000;
         const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+        // -----------------------------------------------------
+        // 1. CLEAN UP ROOMS (Older than 24 Hours)
+        // -----------------------------------------------------
         try {
-            // -----------------------------------------------------
-            // 1. CLEAN UP ROOMS (Older than 24 Hours)
-            // -----------------------------------------------------
             if (window.firebaseRef && window.firebaseGet && window.firebaseDB) {
                 const roomsRef = window.firebaseRef(window.firebaseDB, 'rooms');
                 const roomsSnap = await window.firebaseGet(roomsRef);
@@ -29,15 +31,19 @@ export const databaseJanitor = {
                         // Delete if older than 24 hours OR if it has no timestamp at all
                         if ((roomAge && roomAge > ONE_DAY_MS) || !room.createdAt) {
                             await window.firebaseSet(window.firebaseRef(window.firebaseDB, `rooms/${roomId}`), null);
-                            console.log(`🗑️ Janitor deleted old room: ${roomId}`);
+                            console.log(`%c🗑️ Deleted expired room: ${roomId}`, "color: #f59e0b;");
                         }
                     }
                 }
             }
+        } catch (error) {
+            console.error("%c⚠️ Rooms cleanup failed:", "color: #ef4444;", error);
+        }
 
-            // -----------------------------------------------------
-            // 2. CLEAN UP FEEDBACK STUDENTS (Inactive for 30 Days)
-            // -----------------------------------------------------
+        // -----------------------------------------------------
+        // 2. CLEAN UP FEEDBACK STUDENTS (Inactive for 30 Days)
+        // -----------------------------------------------------
+        try {
             if (window.firebaseRef && window.firebaseGet && window.firebaseDB) {
                 const feedbackRef = window.firebaseRef(window.firebaseDB, 'feedbackStudentsDb');
                 const feedbackSnap = await window.firebaseGet(feedbackRef);
@@ -52,16 +58,16 @@ export const databaseJanitor = {
                         
                         if ((studentAge && studentAge > THIRTY_DAYS_MS) || !student.lastActive) {
                             await window.firebaseSet(window.firebaseRef(window.firebaseDB, `feedbackStudentsDb/${phone}`), null);
-                            console.log(`🗑️ Janitor deleted inactive student: ${phone}`);
+                            console.log(`%c🗑️ Deleted inactive legacy student: ${phone}`, "color: #f59e0b;");
                         }
                     }
                 }
             }
-            
-            console.log("✨ Janitor cleanup complete!");
-
         } catch (error) {
-            console.error("🧹 Janitor encountered an error:", error);
+            console.error("%c⚠️ Students cleanup failed:", "color: #ef4444;", error);
         }
+        
+        console.log("%c✨ Janitor cleanup complete! Database optimized.", "color: #10b981; font-weight: bold;");
+        console.groupEnd();
     }
 };

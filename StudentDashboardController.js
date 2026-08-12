@@ -32,7 +32,7 @@ export const dashboardController = {
         const currentLevel = this.calculateLevel(me.xp);
         const nextLevelXp = Math.pow((currentLevel) / 0.1, 2);
         const currentLevelBaseXp = Math.pow((currentLevel - 1) / 0.1, 2);
-        const progressPercent = ((me.xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100;
+        const progressPercent = Math.min(100, Math.max(0, ((me.xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100));
 
         const previousLevel = appStore.get('localGameData')?.lastKnownLevel || 1;
         if (currentLevel > previousLevel) {
@@ -85,7 +85,7 @@ export const dashboardController = {
         const invEl3 = document.getElementById('inv-timeBurn');
         if(invEl3) invEl3.innerText = inv.timeBurn || 0;
 
-        // 🔥 RENDER BOUNTIES (QUESTS) 🔥
+        // 🔥 RENDER BOUNTIES (QUESTS) - Tailwind Purge Bug Fixed! 🔥
         const questContainer = document.getElementById('quest-container');
         if (questContainer) {
             questContainer.innerHTML = this.quests.map(q => {
@@ -93,32 +93,47 @@ export const dashboardController = {
                 const pct = (progress / q.target) * 100;
                 const isDone = progress >= q.target;
                 
+                // Explicit string assignment to prevent Tailwind Purge
+                const barColorClass = isDone ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]';
+                const borderClass = isDone ? 'border-emerald-400 dark:border-emerald-500/50' : 'border-slate-200 dark:border-white/5';
+
                 return `
-                    <div class="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-white/5 relative overflow-hidden ${isDone ? 'border-green-400 dark:border-green-500/50' : ''} transition-colors">
-                        ${isDone ? '<div class="absolute inset-0 bg-green-500/10 z-0"></div>' : ''}
+                    <div class="bg-white dark:bg-slate-800/50 p-4 rounded-xl border ${borderClass} relative overflow-hidden transition-colors shadow-sm">
+                        ${isDone ? '<div class="absolute inset-0 bg-emerald-500/10 z-0"></div>' : ''}
                         <div class="relative z-10 flex justify-between items-center mb-2">
                             <span class="font-bold text-sm text-slate-800 dark:text-slate-200">${q.name}</span>
-                            <span class="text-xs font-black text-indigo-500 dark:text-indigo-400">${isDone ? '&#10004; DONE' : q.reward}</span>
+                            <span class="text-xs font-black ${isDone ? 'text-emerald-500' : 'text-indigo-500 dark:text-indigo-400'}">${isDone ? '&#10004; DONE' : q.reward}</span>
                         </div>
-                        <div class="relative z-10 w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-                            <div class="bg-${isDone ? 'green' : 'indigo'}-500 h-2 rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
+                        <div class="relative z-10 w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden shadow-inner">
+                            <div class="${barColorClass} h-2 rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
                         </div>
                     </div>
                 `;
             }).join('');
         }
 
-        // 🔥 RENDER TROPHY CASE (BADGES) 🔥
+        // 🔥 RENDER TROPHY CASE (BADGES) - Added Silhouette Lock State 🔥
         const badgeContainer = document.getElementById('badge-container');
         if (badgeContainer) {
             badgeContainer.innerHTML = this.badges.map(b => {
                 const unlocked = b.req(me);
-                return `
-                    <div title="${b.desc}" class="bg-white dark:bg-slate-800/50 p-3 rounded-xl border ${unlocked ? 'border-amber-400 dark:border-yellow-500/50 shadow-[0_0_15px_rgba(250,204,21,0.2)]' : 'border-slate-200 dark:border-white/5 opacity-40 grayscale'} text-center flex flex-col items-center justify-center transition-all hover:scale-105 cursor-help h-24">
-                        <span class="text-3xl mb-1 drop-shadow-md">${b.icon}</span>
-                        <span class="text-[9px] font-black uppercase text-slate-600 dark:text-slate-300 tracking-widest mt-1">${b.name}</span>
-                    </div>
-                `;
+                if (unlocked) {
+                    return `
+                        <div title="${b.desc}" class="bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-800/50 p-3 rounded-xl border border-amber-400 dark:border-amber-500/50 shadow-[0_0_15px_rgba(250,204,21,0.2)] text-center flex flex-col items-center justify-center transition-all hover:scale-105 hover:-translate-y-1 cursor-help h-24 relative overflow-hidden group">
+                            <div class="absolute inset-0 bg-white/20 group-hover:bg-white/40 transition-colors pointer-events-none"></div>
+                            <span class="text-3xl mb-1 drop-shadow-md relative z-10">${b.icon}</span>
+                            <span class="text-[9px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-widest mt-1 relative z-10">${b.name}</span>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div title="${b.desc}" class="bg-slate-100 dark:bg-slate-800/30 p-3 rounded-xl border border-slate-300 dark:border-white/5 opacity-60 text-center flex flex-col items-center justify-center transition-all cursor-not-allowed h-24 relative overflow-hidden">
+                            <span class="absolute top-2 right-2 text-xs opacity-50">&#128274;</span>
+                            <span class="text-3xl mb-1 filter grayscale brightness-50">${b.icon}</span>
+                            <span class="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-1">Locked</span>
+                        </div>
+                    `;
+                }
             }).join('');
         }
     },

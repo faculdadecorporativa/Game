@@ -1,5 +1,5 @@
 // authController.js
-// Strict Gatekeeper Version with Canvas Compression
+// Strict Gatekeeper Version with Canvas Compression & RPG Safety
 
 export const authUI = {
     isProfRegistering: false,
@@ -110,8 +110,16 @@ export const authUI = {
         const inputPass = document.getElementById('prof-pass').value.trim();
         const nameEl = document.getElementById('prof-name');
         const inputName = nameEl ? nameEl.value.trim() : '';
+        const authBtn = document.getElementById('p-auth-btn');
         
         try {
+            // UI Polish: Loading State
+            if (authBtn) {
+                authBtn.innerText = "Authenticating...";
+                authBtn.disabled = true;
+                authBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            }
+
             if (this.isProfRegistering) {
                 await window.authManager.registerProfessor(inputEmail, inputPass, inputName);
                 if(window.toast) window.toast("Registration sent to Management for approval!", true);
@@ -134,6 +142,13 @@ export const authUI = {
             }
         } catch (error) {
             if(window.toast) window.toast(`Auth Failed: ${error.message}`, false);
+        } finally {
+            // UI Polish: Restore Button State
+            if (authBtn) {
+                authBtn.innerText = this.isProfRegistering ? "Register & Request Approval" : "Login";
+                authBtn.disabled = false;
+                authBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
         }
     },
 
@@ -164,7 +179,12 @@ export const authUI = {
     },
 
     showStudentAuth() { 
-        this.isRegistering = false; 
+        this.isRegistering = false;
+        // Reset temp avatar so it doesn't bleed over from previous interactions
+        this.tempAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
+        previewImgs.forEach(img => { if(img) img.src = this.tempAvatar; });
+
         this.updateAuthUI(); 
         if(window.uiManager) window.uiManager.closeModals(); 
         document.getElementById('modal-student-auth').classList.remove('hidden'); 
@@ -191,14 +211,21 @@ export const authUI = {
         const pass = document.getElementById('s-pass').value.trim();
         const nameEl = document.getElementById('s-name');
         const name = nameEl ? nameEl.value.trim() : '';
-        
         const profSelect = document.getElementById('professor-select');
         const profId = profSelect ? profSelect.value : null;
+        const authBtn = document.getElementById('s-auth-btn');
         
         try {
             if (!cc) throw new Error("Please select a Country Code.");
             if (!phone) throw new Error("Please enter your Phone Number.");
             if (phone.length < 6) throw new Error("Please enter a valid Phone Number.");
+
+            // UI Polish: Loading State
+            if (authBtn) {
+                authBtn.innerText = "Authenticating...";
+                authBtn.disabled = true;
+                authBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            }
 
             if (this.isRegistering) {
                 if (!profId) throw new Error("Please select a Professor.");
@@ -238,7 +265,33 @@ export const authUI = {
 
         } catch (error) {
             if(window.toast) window.toast(error.message, false);
+        } finally {
+            // UI Polish: Restore Button State
+            if (authBtn) {
+                authBtn.innerText = this.isRegistering ? "Register & Continue" : "Login";
+                authBtn.disabled = false;
+                authBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
         }
+    },
+
+    // --- NEW: Classroom-Secure Recovery Flow ---
+    showRecovery() {
+        if(window.uiManager) window.uiManager.closeModals(); 
+        document.getElementById('modal-recovery').classList.remove('hidden'); 
+    },
+
+    sendCode() {
+        // Shadow Emails cannot receive actual Firebase reset emails. 
+        // Intercepting and enforcing a secure Classroom Management flow.
+        if (window.uiManager) window.uiManager.closeModals(); 
+        if (window.sfx) window.sfx.play('alert');
+        window.toast("🔒 For security, please ask your Professor to instantly reset your password from their Control Center.", false);
+    },
+
+    resetPassword() {
+        // Fallback catch (UI should prevent reaching here natively)
+        this.sendCode();
     }
 };
 

@@ -1,17 +1,18 @@
 // GameController.js
-// This file handles the core game loop, scoring, and triggering RPG progression events.
+// This file handles the core game loop, scoring, and module logic using the appStore Vault.
 
 import { appStore } from './store.js';
 
+// 🏗️ ENTERPRISE CONFIG: This defines the order of your game modules.
 const GameConfig = [
     { type: 'study', getTarget: () => null }, // Module 1
-    { type: 'dnd', getTarget: (idx) => window.lessonData.vocabulary[idx] }, // Module 2
+    { type: 'puzzle', getTarget: () => window.lessonData.puzzleMatch }, // Module 2 (NEW PVP PUZZLE)
     { type: 'hotspot', getTarget: (idx) => window.lessonData.hotspots[idx] }, // Module 3
-    { type: 'memory', getTarget: () => window.lessonData.memoryMatch }, // Module 4
+    { type: 'tictactoe', getTarget: () => window.lessonData.ticTacToe }, // Module 4
     { type: 'audio', getTarget: (idx) => window.lessonData.audioGuess[idx] }, // Module 5
     { type: 'spelling', getTarget: (idx) => window.lessonData.spellingBee[idx] }, // Module 6
     { type: 'hangman', getTarget: (idx) => window.lessonData.hangman[idx] }, // Module 7
-    { type: 'wally', getTarget: (idx) => window.lessonData.wally[idx] }, // Module 8
+    { type: 'memory', getTarget: () => window.lessonData.memoryMatch }, // Module 8
     { type: 'readAloud', getTarget: (idx) => window.lessonData.readAloud[idx] }, // Module 9
     { type: 'dictation', getTarget: (idx) => window.lessonData.dictation[idx] }, // Module 10
     { type: 'quiz', getTarget: (idx) => window.lessonData.quiz[idx] } // Module 11
@@ -57,13 +58,13 @@ export const game = {
             
             const componentActions = {
                 'study': () => { window.timerManager.stop(); window.uiManager.renderStudy(); },
-                'dnd': () => window.uiManager.renderDnD(targetData),
+                'puzzle': () => this.initPuzzle(targetData),
                 'hotspot': () => window.uiManager.renderHotspot(targetData),
-                'memory': () => this.initMemory(targetData),
+                'tictactoe': () => this.initTicTacToe(targetData),
                 'audio': () => window.uiManager.renderAudio(targetData),
                 'spelling': () => window.uiManager.renderSpelling(targetData),
                 'hangman': () => this.initHangman(targetData),
-                'wally': () => window.uiManager.renderWally(targetData),
+                'memory': () => this.initMemory(targetData),
                 'readAloud': () => window.uiManager.renderReadAloud(targetData),
                 'dictation': () => window.uiManager.renderDictation(targetData),
                 'quiz': () => window.uiManager.renderQuiz(targetData)
@@ -77,8 +78,7 @@ export const game = {
     
     startTimer(sec) { window.timerManager.start(); },
     
-    // 🔥 CORE RPG ENGINE: This handles points, streaks, coins, and unlocks 🔥
-    submitScore(points, skill, msg) {
+    async submitScore(points, skill, msg) {
         if(appStore.get('role') === 'host') { window.toast("Host test: " + msg, points > 0); window.uiManager.lockModule(); return; }
 
         window.timerManager.stop();
@@ -97,11 +97,11 @@ export const game = {
             
             if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
                 const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/extraLife`);
-                window.firebaseSet(userRef, me.inventory.extraLife);
+                await window.firebaseSet(userRef, me.inventory.extraLife);
             }
 
             points = 0;
-            msg = "Saved by Extra Life!";
+            msg = "&#128305; Saved by Extra Life!";
             window.toast(msg, true);
             window.sfx.play('correct'); 
             
@@ -110,7 +110,7 @@ export const game = {
         else if(points > 0) {
             window.sfx.play('correct');
             me.streak++; 
-            if (me.streak > me.maxStreak) me.maxStreak = me.streak; // Track lifetime best streak for Trophies!
+            if (me.streak > me.maxStreak) me.maxStreak = me.streak; 
             
             let earnedXP = points * 10;
             let earnedCoins = points * 5;
@@ -120,11 +120,11 @@ export const game = {
                 earnedXP += 15;
             }
             if(me.streak === 2) {
-                window.toast("Two in a row!", true);
+                window.toast("Two in a row! &#128293;", true);
                 earnedXP += 20;
             }
             if(me.streak >= 3) {
-                window.toast(`Unstoppable! ${me.streak} Streak!`, true);
+                window.toast(`Unstoppable! ${me.streak} Streak! &#129689;`, true);
                 earnedXP += 50;
                 earnedCoins += 10; 
             }
@@ -132,11 +132,11 @@ export const game = {
             if (me.inventory && me.inventory.doubleCoins > 0) {
                 earnedCoins *= 2;
                 me.inventory.doubleCoins -= 1;
-                window.toast("Double Coins Active! Earnings Multiplied!", true);
+                window.toast("&#129689; Double Coins Active! Earnings Multiplied!", true);
                 
                 if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
                     const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/doubleCoins`);
-                    window.firebaseSet(userRef, me.inventory.doubleCoins);
+                    await window.firebaseSet(userRef, me.inventory.doubleCoins);
                 }
             }
 
@@ -154,34 +154,341 @@ export const game = {
         
         if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
             const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}`);
-            window.firebaseSet(userRef, me);
+            await window.firebaseSet(userRef, me);
         }
 
         window.uiManager.updateStudentHUD();
-        if (window.dashboardController) window.dashboardController.renderDashboard(); // Re-render to show quest progress instantly
+        if (window.dashboardController) window.dashboardController.renderDashboard(); 
 
         const hostConn = appStore.get('hostConn');
         if(hostConn) hostConn.send({ type: 'SCORE_UPDATE', id: appStore.get('peer').id, points, skill });
         window.toast(msg + ` (${points > 0 ? '+'+points : points} pts)`, points > 0 || msg.includes("Extra Life")); 
-        window.uiManager.lockModule();
         
-        setTimeout(() => {
-            let currentMod = appStore.get('currentModule');
-            if (currentMod < 11) {
-                window.game.startModule(currentMod + 1, 0);
-            }
-        }, 2000);
+        // 🔥 MULTIPLAYER SYNC FIX: Purged local auto-advancing timeouts. 
+        // Students MUST wait for the Host to broadcast the next module via Firebase!
+        if (appStore.get('currentModule') !== 2 && appStore.get('currentModule') !== 4 && appStore.get('currentModule') !== 8) {
+            window.uiManager.lockModule();
+        }
     },
 
-    handleDnDMatch(isMatch) { if(isMatch) this.submitScore(3, "General", "Matched!"); else this.submitScore(-1, "General", "Missed!"); },
+    // --- DYNAMIC PVP PUZZLE RACE ENGINE (MOD 2) ---
+    initPuzzle(targetData) {
+        if(appStore.get('role') === 'host') return; 
+        
+        let d = appStore.get('localGameData') || {};
+        let puzData = targetData || window.lessonData?.puzzleMatch || {};
+        
+        let questions = structuredClone(puzData.questions || []);
+        if (!questions || questions.length === 0) {
+            questions = [{ q: "Did the Professor forget to add questions?", options: ["Yes", "No", "Maybe", "I don't know"], answer: 0 }];
+        }
+        
+        const count = questions.length;
+        const gridSize = count >= 10 ? 4 : (count >= 5 ? 3 : 2);
+        const totalTiles = gridSize * gridSize;
+
+        d.puzGridSize = gridSize;
+        d.puzBoard = new Array(totalTiles).fill(null);
+        d.puzTurn = 'P1'; 
+        d.puzQuestions = shuffleArray([...questions]);
+        d.puzP1Count = 0;
+        d.puzP2Count = 0;
+        
+        const players = appStore.get('players') || {};
+        const me = appStore.get('me');
+        let opponentName = "AI Bot"; 
+        const others = Object.values(players).filter(p => p.uid !== me?.uid);
+        if(others.length > 0) {
+            opponentName = others[Math.floor(Math.random() * others.length)].name;
+        }
+        
+        d.puzOpponent = opponentName;
+        appStore.set('localGameData', d);
+
+        setTimeout(() => {
+            if(window.uiManager) window.uiManager.initPuzzleUI(opponentName, puzData.image, gridSize);
+        }, 100);
+        
+        window.timerManager.start();
+    },
+
+    handlePuzzleClick(idx) {
+        let d = appStore.get('localGameData');
+        if(d.puzTurn !== 'P1') return window.toast("Wait! It's not your turn yet.", false);
+        if(d.puzBoard[idx] !== null) return window.toast("That tile is already revealed!", false);
+        
+        let q = d.puzQuestions.pop();
+        if(!q) {
+            let rawData = window.lessonData?.puzzleMatch?.questions || [];
+            if (rawData.length === 0) rawData = [{ q: "Recycling Questions...", options: ["A", "B", "C", "D"], answer: 0 }];
+            d.puzQuestions = shuffleArray(structuredClone(rawData));
+            q = d.puzQuestions.pop();
+        }
+        
+        d.pendingPuzIdx = idx;
+        appStore.set('localGameData', d);
+        
+        window.uiManager.showPuzzleQuestion(q);
+    },
+
+    handlePuzzleAnswer(isCorrect, btn) {
+        let d = appStore.get('localGameData');
+        const idx = d.pendingPuzIdx;
+        
+        window.uiManager.hidePuzzleQuestion();
+        
+        if(isCorrect) {
+            window.sfx.play('correct');
+            d.puzBoard[idx] = 'P1';
+            d.puzP1Count++;
+            window.toast("Correct! You claimed a tile.", true);
+            this.submitScore(2, "General", "Tile Claimed!"); 
+        } else {
+            window.sfx.play('wrong');
+            window.toast("Incorrect! You lost your turn.", false);
+            this.submitScore(-1, "General", "Missed question!");
+        }
+        
+        appStore.set('localGameData', d);
+        window.uiManager.updatePuzzleBoard(d.puzBoard);
+        
+        if(this.checkPuzzleWin(d)) return; 
+        
+        d.puzTurn = 'P2';
+        appStore.set('localGameData', d);
+        window.uiManager.setPuzzleStatus(`${d.puzOpponent} is thinking...`, false);
+        
+        setTimeout(() => this.simulatePuzzleOpponent(), 3000 + Math.random() * 2000);
+    },
+
+    simulatePuzzleOpponent() {
+        let d = appStore.get('localGameData');
+        let emptySpots = d.puzBoard.map((val, i) => val === null ? i : null).filter(val => val !== null);
+        
+        if(emptySpots.length === 0) return; 
+        
+        const getsItRight = Math.random() < 0.8;
+        if(getsItRight) {
+            const spot = emptySpots[Math.floor(Math.random() * emptySpots.length)];
+            d.puzBoard[spot] = 'P2';
+            d.puzP2Count++;
+            window.toast(`${d.puzOpponent} answered correctly and claimed a tile!`, false);
+            window.sfx.play('alert');
+        } else {
+            window.toast(`${d.puzOpponent} got their question wrong! Your turn!`, true);
+        }
+        
+        appStore.set('localGameData', d);
+        window.uiManager.updatePuzzleBoard(d.puzBoard);
+        
+        if(this.checkPuzzleWin(d)) return;
+        
+        d.puzTurn = 'P1';
+        appStore.set('localGameData', d);
+        window.uiManager.setPuzzleStatus(`Your Turn! Select a tile to reveal.`, true);
+        window.uiManager.unlockModule();
+    },
+
+    checkPuzzleWin(d) {
+        const winTarget = d.puzGridSize === 4 ? 9 : (d.puzGridSize === 3 ? 5 : 3);
+        
+        if(d.puzP1Count >= winTarget) {
+            this.submitScore(15, "General", "&#127942; You won the Puzzle Race!");
+            this.endPuzzle();
+            return true;
+        } else if (d.puzP2Count >= winTarget) {
+            this.submitScore(-5, "General", "&#128128; You lost the Puzzle Race.");
+            this.endPuzzle();
+            return true;
+        } else if (d.puzBoard.filter(v => v === null).length === 0) {
+            this.submitScore(5, "General", "&#129309; Puzzle Draw!");
+            this.endPuzzle();
+            return true;
+        }
+        return false;
+    },
+
+    endPuzzle() {
+        window.uiManager.lockModule();
+        window.timerManager.stop();
+        // 🔥 MULTIPLAYER SYNC FIX: Removed local auto-advance. Wait for Professor.
+    },
+
     handleHotspot(isHit) { if(isHit) this.submitScore(3, "General", "Found it!"); else this.submitScore(-1, "General", "Missed!"); },
     
+    // --- DYNAMIC TIC-TAC-TOE ENGINE (MOD 4) ---
+    initTicTacToe(targetData) {
+        if(appStore.get('role') === 'host') return; 
+        
+        let d = appStore.get('localGameData') || {};
+        
+        let tttData = structuredClone(targetData || window.lessonData?.ticTacToe || []);
+        if (!tttData || tttData.length === 0) {
+            tttData = [{ q: "Did the Professor forget to add questions?", options: ["Yes", "No", "Maybe", "I don't know"], answer: 0 }];
+        }
+        
+        const count = tttData.length;
+        const gridSize = count >= 10 ? 4 : (count >= 5 ? 3 : 2);
+        const totalTiles = gridSize * gridSize;
+
+        d.tttGridSize = gridSize;
+        d.tttBoard = new Array(totalTiles).fill(null);
+        d.tttTurn = 'X'; 
+        d.tttQuestions = shuffleArray([...tttData]);
+        
+        const players = appStore.get('players') || {};
+        const me = appStore.get('me');
+        let opponentName = "AI Bot"; 
+        const others = Object.values(players).filter(p => p.uid !== me?.uid);
+        if(others.length > 0) {
+            opponentName = others[Math.floor(Math.random() * others.length)].name;
+        }
+        
+        d.tttOpponent = opponentName;
+        appStore.set('localGameData', d);
+
+        setTimeout(() => {
+            if(window.uiManager) window.uiManager.initTicTacToeUI(opponentName, gridSize);
+        }, 100);
+        
+        window.timerManager.start();
+    },
+
+    handleTTTClick(idx) {
+        let d = appStore.get('localGameData');
+        if(d.tttTurn !== 'X') return window.toast("Wait! It's not your turn yet.", false);
+        if(d.tttBoard[idx] !== null) return window.toast("That spot is already taken!", false);
+        
+        let q = d.tttQuestions.pop();
+        if(!q) {
+            let rawData = window.lessonData?.ticTacToe || [];
+            if (rawData.length === 0) rawData = [{ q: "Recycling Questions...", options: ["A", "B", "C", "D"], answer: 0 }];
+            d.tttQuestions = shuffleArray(structuredClone(rawData));
+            q = d.tttQuestions.pop();
+        }
+        
+        d.pendingTTTIdx = idx;
+        appStore.set('localGameData', d);
+        
+        window.uiManager.showTTTQuestion(q);
+    },
+
+    handleTTTAnswer(isCorrect, btn) {
+        let d = appStore.get('localGameData');
+        const idx = d.pendingTTTIdx;
+        
+        window.uiManager.hideTTTQuestion();
+        
+        if(isCorrect) {
+            window.sfx.play('correct');
+            d.tttBoard[idx] = 'X';
+            window.toast("Correct! Placed your X.", true);
+            this.submitScore(2, "General", "Good answer!"); 
+        } else {
+            window.sfx.play('wrong');
+            window.toast("Incorrect! You lost your turn.", false);
+            this.submitScore(-1, "General", "Missed question!");
+        }
+        
+        appStore.set('localGameData', d);
+        window.uiManager.updateTTTBoard(d.tttBoard);
+        
+        if(this.checkTTTWin(d.tttBoard, 'X')) return; 
+        
+        d.tttTurn = 'O';
+        appStore.set('localGameData', d);
+        window.uiManager.setTTTStatus(`${d.tttOpponent} is thinking...`, false);
+        
+        setTimeout(() => this.simulateOpponentTurn(), 3000 + Math.random() * 2000);
+    },
+
+    simulateOpponentTurn() {
+        let d = appStore.get('localGameData');
+        let emptySpots = d.tttBoard.map((val, i) => val === null ? i : null).filter(val => val !== null);
+        
+        if(emptySpots.length === 0) return this.checkTTTWin(d.tttBoard, 'O'); 
+        
+        const getsItRight = Math.random() < 0.8;
+        if(getsItRight) {
+            const spot = emptySpots[Math.floor(Math.random() * emptySpots.length)];
+            d.tttBoard[spot] = 'O';
+            window.toast(`${d.tttOpponent} answered correctly and placed an O!`, false);
+            window.sfx.play('alert');
+        } else {
+            window.toast(`${d.tttOpponent} got their question wrong! Your turn!`, true);
+        }
+        
+        appStore.set('localGameData', d);
+        window.uiManager.updateTTTBoard(d.tttBoard);
+        
+        if(this.checkTTTWin(d.tttBoard, 'O')) return;
+        
+        d.tttTurn = 'X';
+        appStore.set('localGameData', d);
+        window.uiManager.setTTTStatus(`Your Turn! Select a square.`, true);
+        window.uiManager.unlockModule(); 
+    },
+
+    checkTTTWin(board, lastPlayer) {
+        const gridSize = Math.sqrt(board.length);
+        let winCombos = [];
+        
+        for (let r=0; r<gridSize; r++) {
+            let row = [];
+            for (let c=0; c<gridSize; c++) row.push(r*gridSize + c);
+            winCombos.push(row);
+        }
+        for (let c=0; c<gridSize; c++) {
+            let col = [];
+            for (let r=0; r<gridSize; r++) col.push(r*gridSize + c);
+            winCombos.push(col);
+        }
+        let diag1 = [], diag2 = [];
+        for (let i=0; i<gridSize; i++) {
+            diag1.push(i*gridSize + i);
+            diag2.push(i*gridSize + (gridSize - 1 - i));
+        }
+        winCombos.push(diag1, diag2);
+        
+        let won = false;
+        for(let combo of winCombos) {
+            if (combo.every(idx => board[idx] === lastPlayer)) {
+                won = true;
+                break;
+            }
+        }
+        
+        let isDraw = !board.includes(null);
+        
+        if(won) {
+            if(lastPlayer === 'X') {
+                this.submitScore(15, "General", "&#127942; You won Tic-Tac-Toe!");
+            } else {
+                this.submitScore(-5, "General", "&#128128; You lost Tic-Tac-Toe.");
+            }
+            this.endTicTacToe();
+            return true;
+        } else if (isDraw) {
+            this.submitScore(5, "General", "&#129309; Tic-Tac-Toe Draw!");
+            this.endTicTacToe();
+            return true;
+        }
+        return false;
+    },
+
+    endTicTacToe() {
+        window.uiManager.lockModule();
+        window.timerManager.stop();
+        // 🔥 MULTIPLAYER SYNC FIX: Removed local auto-advance.
+    },
+
     initMemory(targetData) {
         let cards = []; 
-        let memData = (targetData && targetData.length > 0) ? targetData : (window.lessonData?.memoryMatch || []);
+        let memData = targetData || window.lessonData?.memoryMatch || [];
         const memType = window.lessonData?.memoryMatchType || 'text-text';
 
         if (!memData || memData.length === 0) {
+            console.warn("Memory Match data missing! Loading defaults.");
             memData = [
                 { term: "Connection", match: "Link" },
                 { term: "Database", match: "Storage" },
@@ -195,11 +502,11 @@ export const game = {
             let matchContent = v.match || "?";
 
             if (memType === 'image-text') {
-                termContent = v.termImg ? `<img src="${v.termImg}" alt="Card Image" class="w-full h-full object-cover rounded-lg">` : (v.term || "No Image");
+                termContent = v.termImg ? `<img src="${v.termImg}" alt="Card" class="w-full h-full object-cover rounded-lg">` : (v.term || "No Image");
                 matchContent = v.match || "No Text";
             } else if (memType === 'image-image') {
-                termContent = v.termImg ? `<img src="${v.termImg}" alt="Card Image 1" class="w-full h-full object-cover rounded-lg">` : (v.term || "No Image");
-                matchContent = v.matchImg ? `<img src="${v.matchImg}" alt="Card Image 2" class="w-full h-full object-cover rounded-lg">` : (v.match || "No Image");
+                termContent = v.termImg ? `<img src="${v.termImg}" alt="Card 1" class="w-full h-full object-cover rounded-lg">` : (v.term || "No Image");
+                matchContent = v.matchImg ? `<img src="${v.matchImg}" alt="Card 2" class="w-full h-full object-cover rounded-lg">` : (v.match || "No Image");
             }
 
             cards.push({ id: idx, type: 'term', content: termContent }); 
@@ -207,12 +514,10 @@ export const game = {
         });
         
         let localGameData = appStore.get('localGameData') || {};
-        
         localGameData.memCards = shuffleArray(cards); 
         localGameData.memFlipped = []; 
         localGameData.memMatched = 0; 
         localGameData.memTotal = memData.length;
-        
         appStore.set('localGameData', localGameData);
         
         setTimeout(() => {
@@ -251,10 +556,7 @@ export const game = {
                         window.uiManager.lockModule(); 
                         window.timerManager.stop(); 
                         window.toast("Memory Cleared!", true); 
-                        
-                        setTimeout(() => {
-                            window.game.startModule(5, 0);
-                        }, 2000);
+                        // 🔥 MULTIPLAYER SYNC FIX: Removed local auto-advance.
                     }
                     else { window.toast("Host test: Memory Cleared!", true); }
                 }
@@ -273,8 +575,8 @@ export const game = {
             }
         }
     },
-    
-    handleAudioAns(isCorrect, btn) { if(isCorrect) { btn.classList.add('bg-green-200'); this.submitScore(3, "Listening", "Correct!"); } else { btn.classList.add('bg-red-200'); this.submitScore(-1, "Listening", "Missed!"); } },
+
+    handleAudioAns(isCorrect, btn) { if(isCorrect) { btn.classList.add('bg-emerald-500', 'text-white', 'border-emerald-600'); this.submitScore(3, "Listening", "Correct!"); } else { btn.classList.add('bg-rose-500', 'text-white', 'border-rose-600'); this.submitScore(-1, "Listening", "Missed!"); } },
     submitSpelling() { const val = document.getElementById('spelling-input').value.trim().toLowerCase(); const target = document.getElementById('spelling-input').dataset.target.trim().toLowerCase(); if(val === target) this.submitScore(3, "Writing", "Perfect!"); else this.submitScore(-1, "Writing", "Typo!"); },
     
     initHangman(data) { 
@@ -291,18 +593,16 @@ export const game = {
         document.getElementById(`hm-btn-${letter}`).disabled = true;
         
         if (d.hmPhrase.includes(letter)) {
-            document.getElementById(`hm-btn-${letter}`).classList.replace('bg-white', 'bg-green-200'); window.uiManager.updateHangmanWord();
+            document.getElementById(`hm-btn-${letter}`).classList.replace('bg-white/80', 'bg-emerald-500'); document.getElementById(`hm-btn-${letter}`).classList.add('text-white'); window.uiManager.updateHangmanWord();
             const isWin = d.hmPhrase.split('').every(char => char === ' ' || d.hmGuessed.includes(char));
             if (isWin) this.submitScore(3, "General", "Phrase Solved!");
         } else {
-            document.getElementById(`hm-btn-${letter}`).classList.replace('bg-white', 'bg-red-200'); d.hmStrikes++; window.uiManager.updateHangmanArt();
+            document.getElementById(`hm-btn-${letter}`).classList.replace('bg-white/80', 'bg-rose-500'); document.getElementById(`hm-btn-${letter}`).classList.add('text-white'); d.hmStrikes++; window.uiManager.updateHangmanArt();
             if (d.hmStrikes >= 6) this.submitScore(-1, "General", `Hanged! Phrase: ${d.hmPhrase}`);
         }
         appStore.set('localGameData', d);
     },
 
-    handleWallyClick(isHit) { if(isHit) this.submitScore(3, "General", "Found!"); else this.submitScore(-1, "General", "Missed!"); },
-    
     toggleReadAloud(forceCancel = false) {
         if (this.isRecordingReadAloud || forceCancel) {
             this.stopReadAloud(forceCancel);
@@ -323,13 +623,13 @@ export const game = {
         this.finalTranscript = "";
         this.isRecordingReadAloud = true;
         
-        btn.classList.replace('bg-red-500', 'bg-slate-800');
-        btn.classList.replace('hover:bg-red-600', 'hover:bg-slate-900');
+        btn.classList.replace('bg-rose-500', 'bg-slate-800');
+        btn.classList.replace('hover:bg-rose-600', 'hover:bg-slate-900');
         btn.classList.replace('rounded-full', 'rounded-xl');
-        icon.innerText = "⏹️";
+        icon.innerText = "&#9209;"; 
         text.innerText = "Stop Recording";
         if(status) {
-            status.innerHTML = '<span class="text-green-500 animate-pulse">🟢 Listening...</span>';
+            status.innerHTML = '<span class="text-emerald-500 animate-pulse">&#128994; Listening...</span>';
             status.dataset.state = 'listening';
         }
 
@@ -348,7 +648,7 @@ export const game = {
             wordSpans.forEach(span => {
                 let cleanWord = cleanString(span.innerText);
                 if (spokenWords.includes(cleanWord)) {
-                    span.classList.add('text-green-600', 'font-bold');
+                    span.classList.add('text-emerald-500', 'font-bold', 'drop-shadow-sm');
                 }
             });
         };
@@ -373,10 +673,10 @@ export const game = {
                 let isLow = avg < 10;
                 if (status) {
                     if (isLow && status.dataset.state !== 'low') {
-                        status.innerHTML = '<span class="text-orange-500">⚠️ Your voice is too low! Please speak up.</span>';
+                        status.innerHTML = '<span class="text-amber-500">&#9888;&#65039; Your voice is too low! Please speak up.</span>';
                         status.dataset.state = 'low';
                     } else if (!isLow && status.dataset.state !== 'listening') {
-                        status.innerHTML = '<span class="text-green-500 animate-pulse">🟢 Listening...</span>';
+                        status.innerHTML = '<span class="text-emerald-500 animate-pulse">&#128994; Listening...</span>';
                         status.dataset.state = 'listening';
                     }
                 }
@@ -388,10 +688,10 @@ export const game = {
             console.error(err); 
             this.stopReadAloud(true);
             if(status) {
-                status.innerHTML = '<span class="text-red-600 font-bold">❌ Microphone blocked. Please allow browser permissions!</span>';
+                status.innerHTML = '<span class="text-rose-500 font-bold">&#10060; Microphone blocked. Please allow browser permissions!</span>';
                 status.dataset.state = 'error';
             }
-            window.toast("Microphone access denied. Please click the mic icon in your URL bar to allow access.", false);
+            window.toast("Microphone access denied. Please allow access.", false);
         }
     },
     
@@ -409,24 +709,24 @@ export const game = {
         if (this.micStream) this.micStream.getTracks().forEach(t => t.stop());
         if (this.audioContext && this.audioContext.state !== 'closed') this.audioContext.close();
 
-        btn.classList.replace('bg-slate-800', 'bg-red-500');
-        btn.classList.replace('hover:bg-slate-900', 'hover:bg-red-600');
+        btn.classList.replace('bg-slate-800', 'bg-rose-500');
+        btn.classList.replace('hover:bg-slate-900', 'hover:bg-rose-600');
         btn.classList.replace('rounded-xl', 'rounded-full');
-        icon.innerText = "🎙️";
+        icon.innerText = "\uD83C\uDF94"; 
         text.innerText = "Start Recording";
         
         if (cancel) return; 
 
         btn.style.pointerEvents = 'none'; 
         if(status) {
-            status.innerHTML = '<span class="text-blue-500 animate-pulse">⏳ Processing audio...</span>';
+            status.innerHTML = '<span class="text-indigo-500 animate-pulse">&#9203; Processing audio...</span>';
             status.dataset.state = 'processing';
         }
 
         setTimeout(() => {
             this.evalReadAloud();
             if(status) {
-                status.innerHTML = '<span class="text-slate-400">🎤 Ready to record</span>';
+                status.innerHTML = '<span class="text-slate-500 dark:text-slate-400">&#127904; Ready to record</span>';
                 status.dataset.state = 'ready';
             }
         }, 1000);
@@ -440,10 +740,10 @@ export const game = {
         const total = wordSpans.length;
 
         wordSpans.forEach(span => {
-            if (span.classList.contains('text-green-600')) {
+            if (span.classList.contains('text-emerald-500')) {
                 matches++;
             } else {
-                span.classList.add('text-red-600', 'line-through', 'font-bold');
+                span.classList.add('text-rose-500', 'line-through', 'font-bold');
             }
         });
 
@@ -468,26 +768,26 @@ export const game = {
         targetWords.forEach((tWord, i) => {
             let vWord = valWords[i] || "";
             if (vWord === tWord) {
-                htmlOut += `<span class="text-green-600 font-bold mx-1">${vWord}</span>`;
+                htmlOut += `<span class="text-emerald-500 font-bold mx-1">${vWord}</span>`;
             } else if (cleanString(vWord) === cleanString(tWord) && cleanString(vWord) !== "") {
-                htmlOut += `<span class="text-yellow-500 font-bold mx-1 underline" title="Target: ${tWord}">${vWord}</span>`;
+                htmlOut += `<span class="text-amber-500 font-bold mx-1 underline" title="Target: ${tWord}">${vWord}</span>`;
             } else {
-                htmlOut += `<span class="text-red-600 font-bold mx-1 line-through" title="Target: ${tWord}">${vWord || '?'}</span>`;
+                htmlOut += `<span class="text-rose-500 font-bold mx-1 line-through" title="Target: ${tWord}">${vWord || '?'}</span>`;
             }
         });
         
         if (valWords.length > targetWords.length) {
             for(let i = targetWords.length; i < valWords.length; i++) {
-                htmlOut += `<span class="text-red-600 font-bold mx-1 line-through" title="Extra word">${valWords[i]}</span>`;
+                htmlOut += `<span class="text-rose-500 font-bold mx-1 line-through" title="Extra word">${valWords[i]}</span>`;
             }
         }
 
         const feedbackEl = document.getElementById('dict-feedback');
         feedbackEl.innerHTML = `
-            <div class="bg-slate-100 p-4 rounded-lg mt-4 text-left border border-slate-300">
-                <p class="text-sm text-slate-500 mb-2 uppercase tracking-widest font-bold">Feedback Analysis:</p>
+            <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 rounded-xl mt-4 text-left border border-slate-200 dark:border-white/10 shadow-inner">
+                <p class="text-xs text-slate-500 mb-2 uppercase tracking-widest font-bold">Feedback Analysis:</p>
                 <div class="text-xl leading-relaxed">${htmlOut}</div>
-                <p class="text-sm text-slate-600 mt-3 font-medium">Target: <b>${target}</b></p>
+                <p class="text-sm text-slate-600 dark:text-slate-300 mt-3 font-medium">Target: <b class="text-slate-800 dark:text-white">${target}</b></p>
             </div>`;
         feedbackEl.classList.remove('opacity-0');
 
@@ -495,5 +795,5 @@ export const game = {
         else this.submitScore(-1, "Writing", "Errors detected in dictation."); 
     },
 
-    handleQuizAns(isCorrect, btn) { if(isCorrect) { btn.classList.add('bg-green-200'); this.submitScore(3, "General", "Correct!"); } else { btn.classList.add('bg-red-200'); this.submitScore(-1, "General", "Missed!"); } }
+    handleQuizAns(isCorrect, btn) { if(isCorrect) { btn.classList.add('bg-emerald-500', 'text-white', 'border-emerald-600'); this.submitScore(3, "General", "Correct!"); } else { btn.classList.add('bg-rose-500', 'text-white', 'border-rose-600'); this.submitScore(-1, "General", "Missed!"); } }
 };

@@ -28,7 +28,7 @@ export const app = {
 
             this.listenToRoom(pin);
 
-            // 2. Update UI to show Professor Dashboard (Bulletproof Error Catching)
+            // 2. Update UI to show Professor Dashboard
             if(window.uiManager && window.uiManager.hideAll) window.uiManager.hideAll(); 
             
             const adminMod = document.getElementById('module-admin');
@@ -45,7 +45,6 @@ export const app = {
             
             if(window.uiManager && window.uiManager.updateProfHUD) window.uiManager.updateProfHUD();
             
-            // Prevents UI freeze if AdminController isn't ready
             if(window.adminUI && typeof window.adminUI.init === 'function') {
                 window.adminUI.init();
             }
@@ -58,82 +57,121 @@ export const app = {
     },
 
     async hostStartGame() {
-        if(window.adminUI && window.adminUI.saveContent) window.adminUI.saveContent();
-        
-        const pin = appStore.get('roomCode');
-        
-        // 🔥 CRITICAL FIX: Push the Professor's custom lesson data to the live room 🔥
-        if (window.lessonData && Object.keys(window.lessonData).length > 0) {
-            const dataRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/lessonData`);
-            await window.firebaseSet(dataRef, window.lessonData);
-            console.log("📡 Broadcasted custom lesson data to room!");
+        try {
+            // 1. Force a final local save of the lesson data
+            if(window.adminUI && window.adminUI.saveContent) window.adminUI.saveContent();
+            
+            const pin = appStore.get('roomCode');
+            
+            // 🔥 CRITICAL FIREBASE CRASH FIX: Strip out all 'undefined' array holes!
+            const cleanLessonData = JSON.parse(JSON.stringify(window.lessonData || {}));
+
+            // 2. Broadcast the pristine lesson data to the live room
+            if (cleanLessonData && Object.keys(cleanLessonData).length > 0) {
+                const dataRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/lessonData`);
+                await window.firebaseSet(dataRef, cleanLessonData);
+                console.log("📡 Broadcasted sanitized custom lesson data to room!");
+            }
+
+            // 3. Initialize dynamic routing state
+            appStore.state.activeModules = cleanLessonData.activeModules || [1,2,3,4,5,6,7,8,9,10,11];
+            if (appStore.state.activeModules.length === 0) {
+                return window.toast("Please check at least one active module!", false);
+            }
+            
+            appStore.state.currentModuleIndex = 0;
+            appStore.state.queues = { study: 0, puzzle: 0, hotspot: 0, tictactoe: 0, audio: 0, spell: 0, hangman: 0, memory: 0, read: 0, dict: 0, quiz: 0 };
+
+            // Update Professor UI immediately so it doesn't look frozen
+            const tabLobby = document.getElementById('tab-lobby');
+            if(tabLobby) tabLobby.classList.add('hidden');
+            
+            if(window.adminUI && window.adminUI.switchTab) window.adminUI.switchTab('analytics'); 
+            
+            // Auto-Open Live Game View
+            appStore.set('isLiveViewOpen', true);
+            const toggleBtn = document.getElementById('btn-toggle-live');
+            if(toggleBtn) toggleBtn.innerText = "Close Live View";
+            
+            const controls = document.getElementById('prof-game-controls');
+            if(controls) controls.classList.remove('hidden');
+            
+            const btnNext = document.getElementById('btn-broadcast-next');
+            if(btnNext) btnNext.classList.remove('hidden');
+
+            // 4. Trigger the Router!
+            this.hostNextModule();
+
+        } catch (error) {
+            console.error("Crash during hostStartGame:", error);
+            if(window.toast) window.toast("Error launching session! Check console logs.", false);
         }
-
-        const gameStateRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/gameState`);
-        
-        // 1. Broadcast "countdown" state
-        await window.firebaseSet(gameStateRef, {
-            status: 'countdown',
-            timeLeft: 60,
-            timestamp: Date.now()
-        });
-
-        // 2. Update Professor UI
-        const tabLobby = document.getElementById('tab-lobby');
-        if(tabLobby) tabLobby.classList.add('hidden');
-        
-        if(window.adminUI && window.adminUI.switchTab) window.adminUI.switchTab('analytics'); 
-        
-        const controls = document.getElementById('prof-game-controls');
-        if(controls) controls.classList.remove('hidden');
-        
-        const profMod = document.getElementById('prof-current-module');
-        if(profMod) profMod.innerText = `Ready to Start`;
-        
-        const btnNext = document.getElementById('btn-broadcast-next');
-        if(btnNext) btnNext.classList.remove('hidden');
     },
 
+    // 🔥 DYNAMIC BULLETPROOF ROUTING ENGINE 🔥
     hostNextModule() {
         const state = appStore.state;
-        let m = 0, idx = 0;
+        let activeMods = state.activeModules || window.lessonData.activeModules || [1,2,3,4,5,6,7,8,9,10,11];
         let lessonData = window.lessonData;
         
-        const processModule = () => {
-            if (state.currentModule === 0) { state.currentModule = 1; m = 1; }
-            else if (state.currentModule === 1) { state.currentModule = 2; m = 2; idx = state.queues.dnd++; if(idx >= lessonData.vocabulary.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 2) { m = 2; idx = state.queues.dnd++; if(idx >= lessonData.vocabulary.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 3) { m = 3; idx = state.queues.hotspot++; if(idx >= lessonData.hotspots.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 4) { state.currentModule = 5; m = 5; idx = state.queues.audio++; if(idx >= lessonData.audioGuess.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 5) { m = 5; idx = state.queues.audio++; if(idx >= lessonData.audioGuess.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 6) { m = 6; idx = state.queues.spell++; if(idx >= lessonData.spellingBee.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 7) { m = 7; idx = state.queues.hangman++; if(idx >= lessonData.hangman.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 8) { m = 8; idx = state.queues.wally++; if(idx >= lessonData.wally.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 9) { m = 9; idx = state.queues.read++; if(idx >= lessonData.readAloud.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 10) { m = 10; idx = state.queues.dict++; if(idx >= lessonData.dictation.length) { this.advQ(); return false; } }
-            else if (state.currentModule === 11) { m = 11; idx = state.queues.quiz++; if(idx >= lessonData.quiz.length) { this.advQ(); return false; } }
-            else { return 'END'; }
-            return true;
-        };
+        if(!state.queues) state.queues = { study: 0, puzzle: 0, hotspot: 0, tictactoe: 0, audio: 0, spell: 0, hangman: 0, memory: 0, read: 0, dict: 0, quiz: 0 };
+        if(state.currentModuleIndex === undefined) state.currentModuleIndex = 0;
 
-        const result = processModule();
-        if (result === false) return; 
+        let m = activeMods[state.currentModuleIndex];
         
-        const pin = appStore.get('roomCode');
-        const gameStateRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/gameState`);
-
-        if (result === 'END') {
+        // If we ran out of modules, end the game smoothly
+        if (!m) {
+            const pin = appStore.get('roomCode');
+            const gameStateRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/gameState`);
             window.firebaseSet(gameStateRef, { status: 'finished', timestamp: Date.now() });
+            
             const profMod = document.getElementById('prof-current-module');
-            if(profMod) profMod.innerText = "Game Over.";
+            if(profMod) profMod.innerText = "Game Over. Check Leaderboard!";
+            
+            appStore.set('currentModule', 12);
+            if(window.uiManager && window.uiManager.showFinalResults) window.uiManager.showFinalResults(appStore.get('players'));
             return;
         }
+        
+        let idx = 0;
+        let moveNext = false;
 
+        // Verify Queues: Only increment and play if there are items left!
+        if (m === 1) { idx = state.queues.study++; if(idx >= 1) moveNext = true; } 
+        else if (m === 2) { idx = state.queues.puzzle++; if(idx >= 1) moveNext = true; } 
+        else if (m === 3) { idx = state.queues.hotspot++; if(idx >= (lessonData.hotspots?.length || 1)) moveNext = true; }
+        else if (m === 4) { idx = state.queues.tictactoe++; if(idx >= 1) moveNext = true; } 
+        else if (m === 5) { idx = state.queues.audio++; if(idx >= (lessonData.audioGuess?.length || 1)) moveNext = true; }
+        else if (m === 6) { idx = state.queues.spell++; if(idx >= (lessonData.spellingBee?.length || 1)) moveNext = true; }
+        else if (m === 7) { idx = state.queues.hangman++; if(idx >= (lessonData.hangman?.length || 1)) moveNext = true; }
+        else if (m === 8) { idx = state.queues.memory++; if(idx >= 1) moveNext = true; } 
+        else if (m === 9) { idx = state.queues.read++; if(idx >= (lessonData.readAloud?.length || 1)) moveNext = true; }
+        else if (m === 10) { idx = state.queues.dict++; if(idx >= (lessonData.dictation?.length || 1)) moveNext = true; }
+        else if (m === 11) { idx = state.queues.quiz++; if(idx >= (lessonData.quiz?.length || 1)) moveNext = true; }
+        
+        // If we ran out of questions for THIS module, jump to the NEXT module
+        if (moveNext) {
+            state.currentModuleIndex++;
+            return this.hostNextModule(); // Recursively loop to next
+        }
+
+        // --- SUCCESS! BROADCAST MODULE ---
         state.currentIndex = idx;
         appStore.set('currentModule', m);
         
+        if(window.uiManager && window.uiManager.hideAll) window.uiManager.hideAll();
+        
+        // Show module to Professor if Live View is Open
+        if(appStore.get('isLiveViewOpen')) {
+            const mEl = document.getElementById(`module-${m}`);
+            if(mEl) mEl.classList.remove('hidden');
+        }
+
         const profMod = document.getElementById('prof-current-module');
         if(profMod) profMod.innerText = `Active: Module ${m} (Item ${idx+1})`;
+
+        const pin = appStore.get('roomCode');
+        const gameStateRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/gameState`);
 
         window.firebaseSet(gameStateRef, {
             status: 'playing',
@@ -145,24 +183,6 @@ export const app = {
         if(window.uiManager && window.uiManager.unlockModule) window.uiManager.unlockModule();
         if(window.game && window.game.startModule) window.game.startModule(m, idx);
     },
-    
-    advQ() { 
-        const state = appStore.state;
-        state.currentModule++; 
-        if (state.currentModule === 4) {
-            const pin = appStore.get('roomCode');
-            const gameStateRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/gameState`);
-            
-            window.firebaseSet(gameStateRef, { status: 'playing', currentModule: 4, currentIndex: 0, timestamp: Date.now() });
-            
-            const profMod = document.getElementById('prof-current-module');
-            if(profMod) profMod.innerText = `Active: Module 4 (Memory Match)`;
-            if(window.uiManager && window.uiManager.unlockModule) window.uiManager.unlockModule();
-            if(window.game && window.game.startModule) window.game.startModule(4, 0);
-        } else {
-            this.hostNextModule(); 
-        }
-    },
 
     // --- STUDENT COMMANDS ---
     showJoinPinScreen() {
@@ -170,16 +190,13 @@ export const app = {
         const pinMod = document.getElementById('module-join-pin');
         if(pinMod) pinMod.classList.remove('hidden');
         
-        // MENTOR FIX: Target the correct UI element ID
         const joinInput = document.getElementById('join-pin-input');
         if(joinInput) joinInput.value = '';
         
-        // MENTOR FIX: Target the correct Button ID
         const btn = document.getElementById('btn-join-lobby');
         if(btn) { btn.innerText = "Enter Lobby"; btn.disabled = false; btn.classList.replace('opacity-50', 'opacity-100'); }
     },
     
-    // MENTOR FIX: Replaced connectToHost() with joinGame(pin) to match UI
     async joinGame(pin) {
         const btn = document.getElementById('btn-join-lobby');
         if(btn) { btn.innerText = "Connecting..."; btn.disabled = true; btn.classList.replace('opacity-100', 'opacity-50'); }
@@ -221,9 +238,8 @@ export const app = {
     listenToRoom(pin) {
         const studentsRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students`);
         const gameStateRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/gameState`);
-        const dataRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/lessonData`); // 🔥 NEW OBSERVER
+        const dataRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/lessonData`); 
 
-        // 🔥 NEW: Student listens for custom data payload beamed from host
         if (appStore.get('role') === 'student') {
             window.firebaseOnValue(dataRef, (snapshot) => {
                 if (snapshot.exists()) {
@@ -248,35 +264,23 @@ export const app = {
             }
         });
 
-        window.firebaseOnValue(gameStateRef, (snapshot) => {
+        // 🔥 CRITICAL FIX: Asynchronous listener guarantees missing data is downloaded before rendering!
+        window.firebaseOnValue(gameStateRef, async (snapshot) => {
             const data = snapshot.val();
             if (!data) return;
 
             if (appStore.get('role') === 'student') {
-                if (data.status === 'countdown') {
+                if (data.status === 'playing') {
+                    clearInterval(appStore.state.countdownInterval);
                     const waitSpinner = document.getElementById('wait-spinner');
                     if(waitSpinner) waitSpinner.classList.add('hidden');
                     
-                    const waitTitle = document.getElementById('wait-title');
-                    if(waitTitle) waitTitle.innerText = "Game Starting!";
-                    
-                    const waitSub = document.getElementById('wait-subtitle');
-                    if(waitSub) waitSub.innerText = "Get ready...";
-                    
-                    const cdEl = document.getElementById('wait-countdown');
-                    if(cdEl) {
-                        cdEl.classList.remove('hidden');
-                        let t = data.timeLeft || 60; 
-                        cdEl.innerText = t;
-                        clearInterval(appStore.state.countdownInterval);
-                        appStore.state.countdownInterval = setInterval(()=>{
-                            t--; if(t>=0) cdEl.innerText = t;
-                            if(t<=0) clearInterval(appStore.state.countdownInterval);
-                        }, 1000);
+                    // 🔥 STRICT SYNC: Force download if lessonData hasn't arrived yet!
+                    if (!window.lessonData || Object.keys(window.lessonData).length === 0) {
+                        const snap = await window.firebaseGet(dataRef);
+                        if (snap.exists()) window.lessonData = snap.val();
                     }
-                } 
-                else if (data.status === 'playing') {
-                    clearInterval(appStore.state.countdownInterval);
+
                     if(window.uiManager && window.uiManager.unlockModule) window.uiManager.unlockModule();
                     if(window.game && window.game.startModule) window.game.startModule(data.currentModule, data.currentIndex);
                     appStore.set('currentModule', data.currentModule);

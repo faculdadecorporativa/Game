@@ -1,5 +1,5 @@
 // UIController.js
-// Handles visual updates
+// Handles visual updates (Heavily Stylized with Glassmorphism)
 
 import { tailwindColors, animalThemes } from './data.js';
 import { appStore } from './store.js';
@@ -7,7 +7,7 @@ import { appStore } from './store.js';
 function getRankEmoji(score, allPlayers) {
     const uniqueScores = [...new Set(allPlayers.map(p => p.score || p.scores?.total || 0))].sort((a, b) => b - a);
     const rank = uniqueScores.indexOf(score);
-    if (rank === 0) return '🥇'; if (rank === 1) return '🥈'; if (rank === 2) return '🥉'; return '';
+    if (rank === 0) return '&#129351;'; if (rank === 1) return '&#129352;'; if (rank === 2) return '&#129353;'; return '';
 }
 
 const hangmanArtFrames = ["\n\n\n\n\n=======", "\n |\n |\n |\n |\n=======", " +---+\n |\n |\n |\n |\n=======", " +---+\n |   O\n |\n |\n |\n=======", " +---+\n |   O\n |   |\n |\n |\n=======", " +---+\n |   O\n |  /|\\\n |\n |\n=======", " +---+\n |   O\n |  /|\\\n |  / \\\n |\n======="];
@@ -49,11 +49,11 @@ export const uiManager = {
 
         if (c) {
             c.innerHTML = `
-                <div id="prof-hud-container" class="flex items-center bg-indigo-900 rounded-full pr-4 p-1 border border-indigo-600 shadow-inner">
-                    <img src="${savedAvatar}" alt="Prof" class="w-10 h-10 rounded-full border-2 border-yellow-300 mr-3 object-cover bg-white">
+                <div id="prof-hud-container" class="flex items-center bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-lg rounded-full pr-5 p-1.5 transition-all">
+                    <img src="${savedAvatar}" alt="Prof" class="w-10 h-10 rounded-full border-2 border-indigo-400 mr-3 object-cover bg-slate-100 dark:bg-slate-900 shadow-inner">
                     <div class="flex flex-col leading-tight text-left">
-                        <span class="text-xs text-indigo-300 uppercase tracking-widest font-bold">Host</span>
-                        <span class="text-sm font-bold text-yellow-300" id="prof-hud-name">${profName}</span>
+                        <span class="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase tracking-widest font-black">Host</span>
+                        <span class="text-sm font-bold text-slate-800 dark:text-white" id="prof-hud-name">${profName}</span>
                     </div>
                 </div>`;
         }
@@ -68,11 +68,11 @@ export const uiManager = {
         const tColorClass = tailwindColors[myTheme.color].light;
 
         c.innerHTML = `
-        <div class="flex items-center bg-indigo-900 rounded-full pr-4 p-1 border border-indigo-600">
-            <img src="${me.avatar}" class="w-10 h-10 rounded-full border-4 ${me.border || 'border-slate-300'} object-cover bg-white mr-3">
+        <div class="flex items-center bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-lg rounded-full pr-5 p-1.5 transition-all">
+            <img src="${me.avatar}" class="w-10 h-10 rounded-full border-2 ${me.border || 'border-slate-300'} object-cover bg-slate-100 dark:bg-slate-900 mr-3 shadow-inner">
             <div class="flex flex-col leading-tight">
-                <span class="text-xs text-indigo-300 font-bold">${me.name} <span class="${tColorClass} ml-1">[${myTheme.name}]</span></span>
-                <span class="text-sm font-bold text-yellow-300">Score: ${me.scores?.total || 0}</span>
+                <span class="text-xs text-slate-800 dark:text-white font-black">${me.name} <span class="${tColorClass} ml-1 font-bold text-[10px] uppercase tracking-widest">[${myTheme.icon || ''} ${myTheme.name}]</span></span>
+                <span class="text-sm font-black text-amber-500 drop-shadow-sm">Score: ${me.scores?.total || 0}</span>
             </div>
         </div>`;
     },
@@ -88,13 +88,17 @@ export const uiManager = {
         Object.values(players).sort((a,b)=>(b.scores?.total || 0) - (a.scores?.total || 0)).forEach(p => {
             const theme = animalThemes[p.team] || animalThemes['eagle'];
             const tBorder = tailwindColors[theme.color].border;
-            c.innerHTML += `<div class="flex items-center gap-2 px-3 py-1 rounded-full border bg-indigo-800 text-indigo-100 ${tBorder}"><img src="${p.avatar}" class="w-6 h-6 rounded-full border border-white ${p.border || 'border-slate-300'} object-cover bg-white"><span class="pl-1">${p.name}: ${p.scores?.total || 0}</span></div>`;
+            c.innerHTML += `
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border bg-white/80 dark:bg-slate-800/80 backdrop-blur-md shadow-sm border-slate-200 dark:border-white/10 text-slate-800 dark:text-white transition-all hover:scale-105">
+                <img src="${p.avatar}" class="w-6 h-6 rounded-full border ${p.border || 'border-slate-300'} object-cover bg-slate-100 dark:bg-slate-900">
+                <span class="pl-1 font-bold text-sm leading-none">${p.name}: <span class="${tailwindColors[theme.color].text}">${p.scores?.total || 0}</span></span>
+            </div>`;
         });
     },
     
     lockModule() { 
         if(appStore.get('role') === 'host') return;
-        document.querySelectorAll('button, input, textarea, .hotspot-area').forEach(e => { 
+        document.querySelectorAll('button, input, textarea, .hotspot-area, .ttt-cell, .puzzle-cell').forEach(e => { 
             if(e.id !== 'btn-audio-listen' && e.id !== 'btn-dict-listen' && !e.classList.contains('lifeline-btn') && e.id !== 'btn-exit-home') e.style.pointerEvents = 'none'; 
         }); 
         document.querySelectorAll('.lifeline-btn').forEach(b => b.disabled = true); 
@@ -108,7 +112,7 @@ export const uiManager = {
     },
     
     unlockModule() {
-        document.querySelectorAll('button, input, textarea, .hotspot-area').forEach(e => { e.style.pointerEvents = 'auto'; }); 
+        document.querySelectorAll('button, input, textarea, .hotspot-area, .ttt-cell, .puzzle-cell').forEach(e => { e.style.pointerEvents = 'auto'; }); 
         const overlay = document.getElementById('wait-overlay');
         if (overlay) overlay.classList.add('hidden');
         
@@ -132,23 +136,110 @@ export const uiManager = {
 
     renderStudy() {
         const c = document.getElementById('flashcards-container'); if(!c) return; c.innerHTML = '';
-        window.lessonData.vocabulary.forEach(item => { c.innerHTML += `<div class="perspective-1000 h-48 w-full group"><div class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-md rounded-xl cursor-pointer" onclick="this.parentElement.classList.toggle('flipped')"><div class="backface-hidden absolute w-full h-full bg-white border border-slate-200 rounded-xl flex flex-col justify-center items-center p-4"><h3 class="text-xl font-bold text-indigo-800">${item.term}</h3><button onclick="event.stopPropagation(); window.speakText('${item.term}');" class="mt-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-2 rounded-full transition-colors">Listen</button></div><div class="backface-hidden rotate-y-180 absolute w-full h-full bg-indigo-600 rounded-xl flex justify-center items-center p-4"><p class="text-white font-medium text-sm md:text-base">${item.def}</p></div></div></div>`; });
+        window.lessonData.vocabulary.forEach(item => { 
+            c.innerHTML += `
+            <div class="perspective-1000 h-48 w-full group">
+                <div class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-md hover:shadow-xl rounded-2xl cursor-pointer transition-all duration-500" onclick="this.parentElement.classList.toggle('flipped')">
+                    <div class="backface-hidden absolute w-full h-full bg-white dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col justify-center items-center p-6">
+                        <h3 class="text-2xl font-black text-indigo-700 dark:text-indigo-400 drop-shadow-sm">${item.term}</h3>
+                        <button onclick="event.stopPropagation(); window.speakText('${item.term}');" class="mt-4 bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/40 text-indigo-600 dark:text-indigo-300 px-4 py-2 rounded-full font-bold transition-colors shadow-sm active:scale-95">Listen</button>
+                    </div>
+                    <div class="backface-hidden rotate-y-180 absolute w-full h-full bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex justify-center items-center p-6 shadow-[inset_0_0_20px_rgba(0,0,0,0.2)]">
+                        <p class="text-white font-medium text-base md:text-lg leading-relaxed drop-shadow-md">${item.def}</p>
+                    </div>
+                </div>
+            </div>`; 
+        });
     },
     
-    renderDnD(data) {
-        document.getElementById('drop-definition-text').innerText = data.def;
-        const dropzone = document.getElementById('dropzone'); dropzone.className = "dropzone w-full max-w-sm h-32 border-4 border-dashed border-slate-300 rounded-xl flex items-center justify-center text-slate-400 font-medium bg-slate-50"; dropzone.innerText = "Drop term here"; dropzone.dataset.target = data.term;
-        const container = document.getElementById('drag-terms-container'); container.innerHTML = '';
-        window.shuffleArray([...window.lessonData.vocabulary]).forEach(item => {
-            const div = document.createElement('div'); div.className = "draggable bg-white border-2 border-slate-200 p-3 rounded-lg text-center font-bold text-slate-700 shadow-sm hover:border-indigo-400"; div.draggable = true; div.innerText = item.term; div.dataset.id = item.term;
-            div.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', item.term); div.classList.add('opacity-50'); }); div.addEventListener('dragend', () => div.classList.remove('opacity-50')); container.appendChild(div);
+    initPuzzleUI(opponentName, bgImage, gridSize) {
+        document.getElementById('puzzle-player-1').innerText = appStore.get('me')?.name || "You";
+        document.getElementById('puzzle-player-2').innerText = opponentName;
+        
+        const bgEl = document.getElementById('puzzle-bg-img');
+        if (bgEl && bgImage) {
+            bgEl.style.backgroundImage = `url(${bgImage})`;
+        }
+        
+        const boardEl = document.getElementById('puzzle-board');
+        if (boardEl) {
+            const gridCols = gridSize === 4 ? 'grid-cols-4' : (gridSize === 3 ? 'grid-cols-3' : 'grid-cols-2');
+            const gridRows = gridSize === 4 ? 'grid-rows-4' : (gridSize === 3 ? 'grid-rows-3' : 'grid-rows-2');
+            
+            let html = '';
+            const totalTiles = gridSize * gridSize;
+            
+            for (let i=0; i < totalTiles; i++) {
+                html += `<div id="puzzle-cell-${i}" onclick="if(window.game && window.game.handlePuzzleClick) window.game.handlePuzzleClick(${i})" class="puzzle-cell bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-300 dark:border-white/10 flex items-center justify-center cursor-pointer transition-all hover:bg-white dark:hover:bg-slate-800 hover:shadow-[0_0_15px_rgba(99,102,241,0.5)] group">
+                    <span class="text-slate-400 dark:text-slate-500 font-black ${gridSize === 4 ? 'text-2xl md:text-3xl' : 'text-4xl md:text-5xl'} opacity-40 group-hover:opacity-100 group-hover:scale-110 group-hover:text-indigo-500 transition-all">?</span>
+                </div>`;
+            }
+            
+            boardEl.innerHTML = html;
+            boardEl.className = `absolute inset-0 z-10 grid gap-1 md:gap-2 transition-all duration-300 p-1 md:p-2 ${gridCols} ${gridRows}`;
+        }
+        this.setPuzzleStatus("Your Turn! Select a tile to reveal.", true);
+    },
+
+    updatePuzzleBoard(board) {
+        for(let i=0; i<board.length; i++) {
+            const cell = document.getElementById(`puzzle-cell-${i}`);
+            if(cell && board[i]) {
+                cell.classList.remove('bg-white/90', 'dark:bg-slate-900/90', 'backdrop-blur-xl', 'hover:shadow-[0_0_15px_rgba(99,102,241,0.5)]');
+                cell.classList.add('bg-transparent', 'backdrop-blur-none');
+                cell.innerHTML = ''; 
+                
+                if(board[i] === 'P1') {
+                    cell.classList.add('border-4', 'border-indigo-500', 'shadow-[inset_0_0_20px_rgba(99,102,241,0.8)]');
+                } else {
+                    cell.classList.add('border-4', 'border-rose-500', 'shadow-[inset_0_0_20px_rgba(244,63,94,0.8)]');
+                }
+            }
+        }
+    },
+
+    setPuzzleStatus(msg, isMyTurn) {
+        const st = document.getElementById('puzzle-status');
+        if(st) {
+            st.innerText = msg;
+            if(isMyTurn) {
+                st.classList.replace('text-rose-500', 'text-indigo-500');
+                st.classList.replace('dark:text-rose-400', 'dark:text-indigo-400');
+            } else {
+                st.classList.replace('text-indigo-500', 'text-rose-500');
+                st.classList.replace('dark:text-indigo-400', 'dark:text-rose-400');
+            }
+        }
+    },
+
+    showPuzzleQuestion(qData) {
+        const overlay = document.getElementById('puzzle-question-overlay');
+        const qText = document.getElementById('puzzle-q-text');
+        const optsContainer = document.getElementById('puzzle-options');
+        
+        if(!overlay || !qText || !optsContainer) return;
+        
+        qText.innerText = qData.q;
+        optsContainer.innerHTML = '';
+        
+        qData.options.forEach((opt, idx) => {
+            const btn = document.createElement('button');
+            btn.className = "w-full text-left p-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300";
+            btn.innerText = opt;
+            btn.onclick = () => window.game.handlePuzzleAnswer(idx === qData.answer, btn);
+            optsContainer.appendChild(btn);
         });
-        dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); }; dropzone.ondragleave = () => dropzone.classList.remove('drag-over');
-        dropzone.ondrop = (e) => {
-            e.preventDefault(); dropzone.classList.remove('drag-over'); const draggedId = e.dataTransfer.getData('text/plain'); const draggedElement = document.querySelector(`[data-id="${draggedId}"]`);
-            if (draggedId === data.term) { dropzone.innerHTML = ''; dropzone.appendChild(draggedElement); draggedElement.classList.replace('border-slate-200', 'border-green-500'); draggedElement.classList.add('bg-green-50', 'text-green-800'); window.game.handleDnDMatch(true); } 
-            else { draggedElement.classList.add('snap-back', 'border-red-500', 'bg-red-50', 'text-red-600'); setTimeout(() => draggedElement.classList.remove('snap-back', 'border-red-500', 'bg-red-50', 'text-red-600'), 400); window.game.handleDnDMatch(false); }
-        };
+        
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+    },
+
+    hidePuzzleQuestion() {
+        const overlay = document.getElementById('puzzle-question-overlay');
+        if(overlay) {
+            overlay.classList.add('opacity-0');
+            setTimeout(() => overlay.classList.add('hidden'), 300);
+        }
     },
     
     renderHotspot(data) {
@@ -160,152 +251,172 @@ export const uiManager = {
         layer.appendChild(target); 
     },
     
-    renderMemoryGrid(cards) {
-        let container = document.getElementById('memory-grid'); 
+    initTicTacToeUI(opponentName, gridSize) {
+        document.getElementById('ttt-player-x').innerText = appStore.get('me')?.name || "You";
+        document.getElementById('ttt-player-o').innerText = opponentName;
         
-        if (!container) {
-            const mod4 = document.getElementById('module-4');
-            if (mod4) {
-                mod4.innerHTML = `
-                    <span class="text-indigo-600 dark:text-white font-bold tracking-wider uppercase text-sm transition-colors duration-300">Module 4 of 11</span>
-                    <h2 class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 mb-6 transition-colors duration-300">Memory Match</h2>
-                    <div id="lifeline-mount-4"></div>
-                    <div class="bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl p-4 md:p-6 rounded-3xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 relative pb-14 transition-all duration-300 w-full mx-auto">
-                        <div class="mb-4 flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">
-                            <span id="memory-progress" class="text-sm font-bold text-slate-500 dark:text-slate-300 transition-colors duration-300"></span>
-                            <span class="text-sm font-bold text-indigo-600 dark:text-white transition-colors duration-300">+3 Pts / -1 Pt</span>
-                        </div>
-                        <div id="memory-grid" class="grid gap-2 sm:gap-3 md:gap-4 w-full transition-all duration-500 mx-auto"></div>
-                        <div id="memory-feedback" class="mt-4 font-bold text-xl text-slate-800 dark:text-white absolute bottom-4 w-full left-0 opacity-0 transition-opacity"></div>
-                    </div>
-                `;
-                container = document.getElementById('memory-grid');
-                
-                const panel = document.getElementById('lifelines-panel');
-                const mount = document.getElementById('lifeline-mount-4');
-                if (panel && mount) {
-                    panel.classList.remove('hidden');
-                    mount.appendChild(panel);
-                }
-            } else {
-                return;
-            }
-        }
-        
-        container.className = 'grid gap-2 sm:gap-3 md:gap-4 w-full mx-auto';
-        
-        let colsMobile = 3, colsTablet = 4, colsDesktop = 6;
-        if (cards.length > 36) { colsMobile = 4; colsTablet = 8; colsDesktop = 12; }
-        else if (cards.length > 24) { colsMobile = 4; colsTablet = 6; colsDesktop = 10; }
-        else if (cards.length > 16) { colsMobile = 4; colsTablet = 6; colsDesktop = 8; }
-        else if (cards.length > 8) { colsMobile = 3; colsTablet = 4; colsDesktop = 6; }
-        else { colsMobile = 2; colsTablet = 3; colsDesktop = 4; }
-        
-        const styleId = 'dynamic-grid-style';
-        let styleEl = document.getElementById(styleId);
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-        
-        styleEl.innerHTML = `
-            #memory-grid { grid-template-columns: repeat(${colsMobile}, minmax(0, 1fr)); }
-            @media (min-width: 640px) { #memory-grid { grid-template-columns: repeat(${colsTablet}, minmax(0, 1fr)); } }
-            @media (min-width: 1024px) { #memory-grid { grid-template-columns: repeat(${colsDesktop}, minmax(0, 1fr)); } }
+        const boardEl = document.getElementById('ttt-board');
+        if(boardEl) {
+            const gridCols = gridSize === 4 ? 'grid-cols-4' : (gridSize === 3 ? 'grid-cols-3' : 'grid-cols-2');
+            const gridRows = gridSize === 4 ? 'grid-rows-4' : (gridSize === 3 ? 'grid-rows-3' : 'grid-rows-2');
             
-            .perspective-1000 { perspective: 1000px; }
-            .transform-style-3d { transform-style: preserve-3d; }
-            .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-            .rotate-y-180 { transform: rotateY(180deg); }
-            .front-face, .back-face {
-                border-radius: 1rem !important; overflow: hidden !important; 
-                position: absolute !important; top: 0; left: 0; width: 100% !important; height: 100% !important;
-                background-color: #ffffff !important; border: 1px solid #e2e8f0 !important;
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            let html = '';
+            const totalTiles = gridSize * gridSize;
+            
+            for (let i=0; i < totalTiles; i++) {
+                html += `<div id="ttt-cell-${i}" onclick="if(window.game && window.game.handleTTTClick) window.game.handleTTTClick(${i})" class="ttt-cell bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl flex items-center justify-center ${gridSize === 4 ? 'text-4xl md:text-5xl' : 'text-6xl md:text-7xl'} font-black cursor-pointer shadow-sm border border-slate-200 dark:border-white/10 hover:border-indigo-400 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] transition-all hover:scale-[1.02] active:scale-95 aspect-square select-none"></div>`;
             }
-            .dark .front-face, .dark .back-face {
-                background-color: rgba(30, 30, 40, 0.6) !important; border: 1px solid rgba(99, 102, 241, 0.4) !important; 
-                box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important; backdrop-filter: blur(16px) !important;
-            }
-            #memory-grid .flipped .flip-card-inner, #memory-grid .matched .flip-card-inner { transform: rotateY(180deg) !important; }
-            #memory-grid .matched .back-face { background-color: #22c55e !important; border-color: #16a34a !important; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.4) !important; }
-            .dark #memory-grid .matched .back-face { background-color: rgba(79, 70, 229, 0.8) !important; border-color: #ffffff !important; box-shadow: 0 0 20px rgba(79, 70, 229, 0.8) !important; }
-            #memory-grid img { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 1rem !important; pointer-events: none !important; }
-            #memory-grid * { color: #1e293b !important; }
-            #memory-grid .matched .back-face * { color: #ffffff !important; }
-            .dark #memory-grid * { color: #ffffff !important; }
-        `;
+            
+            boardEl.innerHTML = html;
+            boardEl.className = `grid gap-2 md:gap-3 aspect-square w-full relative z-10 transition-all duration-300 ${gridCols} ${gridRows}`;
+        }
+        this.setTTTStatus("Your Turn! Select a square.", true);
+    },
 
-        container.innerHTML = '';
-        
-        cards.forEach((card, idx) => {
-            const cDiv = document.createElement('div'); 
-            cDiv.className = "perspective-1000 w-full aspect-square";
-            
-            let backContent = '';
-            const safeContent = String(card.content || "");
-            
-            if (safeContent.includes('<img') || safeContent.startsWith('data:image')) {
-                if (safeContent.includes('<img')) {
-                    backContent = safeContent.replace('<img ', '<img class="w-full h-full object-cover rounded-lg absolute inset-0 z-10" ');
+    updateTTTBoard(board) {
+        for(let i=0; i<board.length; i++) {
+            const cell = document.getElementById(`ttt-cell-${i}`);
+            if(cell && board[i]) {
+                cell.innerText = board[i];
+                if(board[i] === 'X') {
+                    cell.classList.add('text-indigo-500', 'dark:text-indigo-400', 'shadow-[inset_0_0_20px_rgba(99,102,241,0.2)]');
                 } else {
-                    backContent = `<img src="${safeContent}" alt="Match Image" class="w-full h-full object-cover rounded-lg absolute inset-0 z-10">`;
+                    cell.classList.add('text-rose-500', 'dark:text-rose-400', 'shadow-[inset_0_0_20px_rgba(244,63,94,0.2)]');
                 }
-            } else {
-                backContent = `<span class="font-bold text-base md:text-xl xl:text-2xl leading-tight px-1 break-words relative z-10 max-h-full overflow-hidden flex items-center justify-center">${safeContent}</span>`;
             }
+        }
+    },
 
-            cDiv.innerHTML = `
-                <div id="memory-card-${idx}" class="flip-card-inner transform-style-3d transition-transform duration-500 relative w-full h-full text-center cursor-pointer" onclick="window.game.handleMemoryClick(${idx})">
-                    <div class="front-face backface-hidden absolute w-full h-full flex items-center justify-center text-3xl md:text-4xl font-black rounded-xl border border-slate-200 dark:border-indigo-500/30">?</div>
-                    <div class="back-face backface-hidden rotate-y-180 absolute w-full h-full flex items-center justify-center rounded-xl relative border border-slate-200 dark:border-indigo-500/30">
-                        ${backContent}
-                    </div>
-                </div>`;
-            container.appendChild(cDiv);
+    setTTTStatus(msg, isMyTurn) {
+        const st = document.getElementById('ttt-status');
+        if(st) {
+            st.innerText = msg;
+            if(isMyTurn) {
+                st.classList.replace('text-rose-500', 'text-indigo-500');
+                st.classList.replace('dark:text-rose-400', 'dark:text-indigo-400');
+            } else {
+                st.classList.replace('text-indigo-500', 'text-rose-500');
+                st.classList.replace('dark:text-indigo-400', 'dark:text-rose-400');
+            }
+        }
+    },
+
+    showTTTQuestion(qData) {
+        const overlay = document.getElementById('ttt-question-overlay');
+        const qText = document.getElementById('ttt-q-text');
+        const optsContainer = document.getElementById('ttt-options');
+        
+        if(!overlay || !qText || !optsContainer) return;
+        
+        qText.innerText = qData.q;
+        optsContainer.innerHTML = '';
+        
+        qData.options.forEach((opt, idx) => {
+            const btn = document.createElement('button');
+            btn.className = "w-full text-left p-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300";
+            btn.innerText = opt;
+            btn.onclick = () => window.game.handleTTTAnswer(idx === qData.answer, btn);
+            optsContainer.appendChild(btn);
         });
+        
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.remove('opacity-0'), 10);
     },
 
-    flipMemoryCard(idx) { 
-        const card = document.getElementById(`memory-card-${idx}`);
-        if(card && card.parentElement) card.parentElement.classList.add('flipped'); 
+    hideTTTQuestion() {
+        const overlay = document.getElementById('ttt-question-overlay');
+        if(overlay) {
+            overlay.classList.add('opacity-0');
+            setTimeout(() => overlay.classList.add('hidden'), 300);
+        }
     },
-    unflipMemoryCard(idx) { 
-        const card = document.getElementById(`memory-card-${idx}`);
-        if(card && card.parentElement) card.parentElement.classList.remove('flipped'); 
-    },
-    markMemoryMatched(idx1, idx2) { 
-        const card1 = document.getElementById(`memory-card-${idx1}`);
-        const card2 = document.getElementById(`memory-card-${idx2}`);
-        if(card1 && card1.parentElement) card1.parentElement.classList.add('matched'); 
-        if(card2 && card2.parentElement) card2.parentElement.classList.add('matched'); 
+
+    renderMemoryGrid(cards) {
+        const grid = document.getElementById('memory-grid');
+        if(!grid) return;
+        grid.innerHTML = '';
+        
+        let cols = 'grid-cols-3 md:grid-cols-4';
+        if (cards.length > 12) cols = 'grid-cols-4 md:grid-cols-5';
+        else if (cards.length <= 6) cols = 'grid-cols-2 md:grid-cols-3';
+        
+        grid.className = `grid gap-2 md:gap-4 w-full transition-all duration-500 ${cols}`;
+        
+        cards.forEach((card, i) => {
+            grid.innerHTML += `
+            <div class="perspective-1000 aspect-[4/3] w-full group cursor-pointer hover:scale-105 active:scale-95 transition-all duration-300" onclick="if(window.game && window.game.handleMemoryClick) window.game.handleMemoryClick(${i})">
+                <div id="mem-card-${i}" class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-sm hover:shadow-lg rounded-xl transition-transform duration-500">
+                    <div class="front-face flex flex-col justify-center items-center p-2 cursor-pointer z-20 absolute inset-0 rounded-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-white/10">
+                        <span class="text-3xl md:text-4xl opacity-50 drop-shadow-sm">&#10068;</span>
+                    </div>
+                    <div class="back-face rotate-y-180 absolute inset-0 bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-300 dark:border-indigo-500/50 rounded-xl flex justify-center items-center p-2 cursor-pointer z-10 overflow-hidden shadow-[inset_0_0_15px_rgba(99,102,241,0.2)]">
+                        <div class="font-bold text-sm md:text-base break-words w-full dark:text-white drop-shadow-sm">${card.content}</div>
+                    </div>
+                </div>
+            </div>`;
+        });
+        
+        this.updateMemoryProgress();
     },
     
+    flipMemoryCard(idx) {
+        const card = document.getElementById(`mem-card-${idx}`);
+        if(card) card.parentElement.classList.add('flipped');
+    },
+    
+    unflipMemoryCard(idx) {
+        const card = document.getElementById(`mem-card-${idx}`);
+        if(card) card.parentElement.classList.remove('flipped');
+    },
+    
+    markMemoryMatched(idx1, idx2) {
+        const c1 = document.getElementById(`mem-card-${idx1}`);
+        const c2 = document.getElementById(`mem-card-${idx2}`);
+        if(c1) {
+            c1.parentElement.classList.add('matched');
+            c1.parentElement.classList.remove('cursor-pointer');
+        }
+        if(c2) {
+            c2.parentElement.classList.add('matched');
+            c2.parentElement.classList.remove('cursor-pointer');
+        }
+        this.updateMemoryProgress();
+    },
+    
+    updateMemoryProgress() {
+        const d = appStore.get('localGameData');
+        const p = document.getElementById('memory-progress');
+        if(p && d) p.innerText = `Matches: ${d.memMatched || 0} / ${d.memTotal || 0}`;
+    },
+
     renderAudio(data) {
         document.getElementById('btn-audio-listen').onclick = () => window.speakText(data.desc); const c = document.getElementById('audio-options-container'); c.innerHTML = ''; c.dataset.answer = data.answer;
-        data.options.forEach((opt, idx) => { const btn = document.createElement('button'); btn.className = "w-full text-left p-4 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 hover:border-indigo-400 transition-colors shadow-sm"; btn.innerText = opt; btn.onclick = () => window.game.handleAudioAns(idx === data.answer, btn); c.appendChild(btn); });
+        data.options.forEach((opt, idx) => { 
+            const btn = document.createElement('button'); 
+            btn.className = "w-full text-left p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300"; 
+            btn.innerText = opt; 
+            btn.onclick = () => window.game.handleAudioAns(idx === data.answer, btn); 
+            c.appendChild(btn); 
+        });
     },
     
     renderSpelling(data) { document.getElementById('btn-spelling-listen').onclick = () => window.speakText(data.word); const inp = document.getElementById('spelling-input'); inp.value = ''; inp.dataset.target = data.word; },
     
     renderHangman(phrase) {
         this.updateHangmanArt(); this.updateHangmanWord(); const kbd = document.getElementById('hangman-keyboard'); kbd.innerHTML = '';
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(char => { const btn = document.createElement('button'); btn.id = `hm-btn-${char}`; btn.className = "w-10 h-10 font-bold rounded-lg shadow-sm border border-slate-300 bg-white hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"; btn.innerText = char; btn.onclick = () => window.game.handleHangmanGuess(char); kbd.appendChild(btn); });
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(char => { 
+            const btn = document.createElement('button'); 
+            btn.id = `hm-btn-${char}`; 
+            btn.className = "w-10 h-10 font-bold rounded-xl shadow-sm border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-800 dark:text-white hover:bg-indigo-500 hover:text-white hover:border-indigo-500 hover:shadow-[0_0_10px_rgba(99,102,241,0.5)] hover:-translate-y-1 active:scale-95 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"; 
+            btn.innerText = char; 
+            btn.onclick = () => window.game.handleHangmanGuess(char); 
+            kbd.appendChild(btn); 
+        });
     },
     updateHangmanArt() { document.getElementById('hangman-art').innerText = hangmanArtFrames[appStore.get('localGameData').hmStrikes]; },
     updateHangmanWord() {
         const c = document.getElementById('hangman-word'); c.innerHTML = '';
-        appStore.get('localGameData').hmPhrase.split('').forEach(char => { const span = document.createElement('span'); if (char === ' ') span.innerHTML = '&nbsp;&nbsp;'; else { span.className = "border-b-4 border-indigo-700 mx-1 w-6 inline-block text-center"; span.innerText = appStore.get('localGameData').hmGuessed.includes(char) ? char : '_'; } c.appendChild(span); });
-    },
-    
-    renderWally(data) {
-        document.getElementById('wally-prompt').innerText = data.prompt; const layer = document.getElementById('wally-layer'); layer.innerHTML = ''; document.getElementById('wally-container').scrollTop = 0; document.getElementById('wally-container').scrollLeft = 0;
-        const target = document.createElement('div'); target.className = 'hotspot-area'; target.style.top = `${data.target.top}%`; target.style.left = `${data.target.left}%`; target.style.width = `${data.target.width}%`; target.style.height = `${data.target.height}%`;
-        let clicked = false; target.onclick = (e) => { e.stopPropagation(); if(clicked) return; clicked = true; target.classList.add('hotspot-revealed-hit'); window.game.handleWallyClick(true); };
-        const clickWrap = document.createElement('div'); clickWrap.className = "absolute inset-0 z-0"; clickWrap.onclick = () => { if(clicked) return; clicked = true; target.classList.add('hotspot-revealed-miss'); window.game.handleWallyClick(false); };
-        layer.appendChild(clickWrap); layer.appendChild(target); 
+        appStore.get('localGameData').hmPhrase.split('').forEach(char => { const span = document.createElement('span'); if (char === ' ') span.innerHTML = '&nbsp;&nbsp;'; else { span.className = "border-b-4 border-indigo-700 dark:border-indigo-400 mx-1 w-6 inline-block text-center shadow-sm"; span.innerText = appStore.get('localGameData').hmGuessed.includes(char) ? char : '_'; } c.appendChild(span); });
     },
     
     renderReadAloud(data) { 
@@ -313,7 +424,7 @@ export const uiManager = {
         document.getElementById('read-aloud-target').innerHTML = wrappedText; 
         const btn = document.getElementById('btn-record-read'); 
         btn.style.pointerEvents = 'auto';
-        btn.className = "bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-10 rounded-full shadow-lg text-xl mx-auto flex items-center gap-3 transition-all duration-300"; 
+        btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-black py-4 px-10 rounded-full shadow-[0_0_20px_rgba(244,63,94,0.4)] text-xl mx-auto flex items-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95"; 
         document.getElementById('record-icon').innerText = "Record"; document.getElementById('record-text').innerText = "Start Recording";
         const status = document.getElementById('read-status-feedback');
         if (status) { status.innerHTML = '<span class="text-slate-400">Ready to record</span>'; status.dataset.state = 'ready'; }
@@ -324,7 +435,13 @@ export const uiManager = {
     
     renderQuiz(data) {
         document.getElementById('quiz-question-text').innerText = data.q; const c = document.getElementById('quiz-options-container'); c.innerHTML = ''; c.dataset.answer = data.answer;
-        data.options.forEach((opt, index) => { const btn = document.createElement('button'); btn.className = "w-full text-left p-4 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 hover:border-indigo-400 shadow-sm"; btn.innerText = opt; btn.onclick = () => window.game.handleQuizAns(index === data.answer, btn); c.appendChild(btn); });
+        data.options.forEach((opt, index) => { 
+            const btn = document.createElement('button'); 
+            btn.className = "w-full text-left p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300"; 
+            btn.innerText = opt; 
+            btn.onclick = () => window.game.handleQuizAns(index === data.answer, btn); 
+            c.appendChild(btn); 
+        });
     },
     
     showFinalResults(playersObj) {
@@ -345,10 +462,10 @@ export const uiManager = {
             if(winningTeams.length === 1) { 
                 const theme = animalThemes[winningTeams[0]] || animalThemes['eagle'];
                 const bgClass = tailwindColors[theme.color].heavy;
-                tw.className = `mb-10 rounded-xl p-6 text-white border-2 shadow-xl ${bgClass}`;
+                tw.className = `mb-10 rounded-2xl p-8 text-white border border-white/20 shadow-[0_0_40px_rgba(255,255,255,0.2)] ${bgClass} backdrop-blur-xl relative overflow-hidden transform hover:scale-105 transition-all`;
                 tw_text.innerHTML = `TEAM WINS! (${maxScore} pts)`; 
             }
-            else { tw.className = `mb-10 rounded-xl p-6 text-white border-2 shadow-xl bg-slate-800`; tw_text.innerHTML = `IT'S A TIE! (${maxScore} pts)`; }
+            else { tw.className = `mb-10 rounded-2xl p-8 text-white border border-white/20 shadow-[0_0_40px_rgba(255,255,255,0.2)] bg-slate-800 backdrop-blur-xl relative overflow-hidden transform hover:scale-105 transition-all`; tw_text.innerHTML = `IT'S A TIE! (${maxScore} pts)`; }
         }
 
         const sorted = Object.values(playersObj).sort((a,b) => (b.scores?.total || 0) - (a.scores?.total || 0)); 
@@ -360,14 +477,27 @@ export const uiManager = {
             const theme = animalThemes[p.team] || animalThemes['eagle'];
             const tColorClass = tailwindColors[theme.color].text;
 
-            // 🔥 UPDATED: Added dark mode classes for leaderboard items 🔥
-            if(list) list.innerHTML += `<li class="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100"><div class="flex items-center gap-4"><span class="font-bold text-slate-400 text-xl w-6">${i+1}.</span><div class="relative"><img src="${p.avatar}" class="w-12 h-12 rounded-full object-cover border-4 ${p.border || 'border-slate-300'} bg-white">${medal ? `<span class="absolute -bottom-2 -right-2 text-2xl drop-shadow">${medal}</span>` : ''}</div><div class="flex flex-col"><span class="font-bold text-slate-800 dark:text-white text-2xl leading-none">${p.name}</span><span class="text-xs font-bold uppercase ${tColorClass}">${theme.name} Team</span></div></div><span class="font-black text-indigo-600 dark:text-indigo-400 text-3xl">${p.scores?.total || 0} pts</span></li>`; 
+            if(list) list.innerHTML += `
+            <li class="flex justify-between items-center p-4 bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-white/10 shadow-lg mb-4 transform hover:-translate-y-1 transition-all">
+                <div class="flex items-center gap-4">
+                    <span class="font-black text-slate-400 dark:text-slate-500 text-2xl w-8 text-center drop-shadow-sm">${i+1}.</span>
+                    <div class="relative">
+                        <img src="${p.avatar}" class="w-14 h-14 rounded-full object-cover border-4 ${p.border || 'border-slate-300'} bg-slate-100 dark:bg-slate-700 shadow-inner">
+                        ${medal ? `<span class="absolute -bottom-2 -right-2 text-3xl drop-shadow-lg filter hover:scale-110 transition-transform cursor-default">${medal}</span>` : ''}
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-black text-slate-800 dark:text-white text-2xl leading-none drop-shadow-sm">${p.name}</span>
+                        <span class="text-xs font-black uppercase tracking-widest ${tColorClass} drop-shadow-sm mt-1">${theme.icon || ''} ${theme.name} Team</span>
+                    </div>
+                </div>
+                <span class="font-black text-indigo-600 dark:text-indigo-400 text-4xl drop-shadow-md pr-4">${p.scores?.total || 0} pts</span>
+            </li>`; 
         });
         
         if(appStore.get('role') === 'student') {
             document.getElementById('student-personal-stats').classList.remove('hidden'); const bars = document.getElementById('student-skill-bars'); bars.innerHTML = '';
             const me = appStore.get('me');
-            ['Speaking', 'Writing', 'Listening', 'General'].forEach(sk => { const pts = me.scores[sk] || 0; bars.innerHTML += `<div><div class="flex justify-between text-sm font-bold text-slate-600 dark:text-slate-300 mb-1"><span>${sk}</span><span>${pts} pts</span></div><div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-3"><div class="bg-indigo-600 h-3 rounded-full" style="width: ${Math.min(100, Math.max(0, pts*10))}%"></div></div></div>`; });
+            ['Speaking', 'Writing', 'Listening', 'General'].forEach(sk => { const pts = me.scores[sk] || 0; bars.innerHTML += `<div><div class="flex justify-between text-sm font-bold text-slate-600 dark:text-slate-300 mb-1 tracking-wider uppercase"><span>${sk}</span><span class="text-indigo-600 dark:text-indigo-400">${pts} pts</span></div><div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-4 shadow-inner"><div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-4 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000" style="width: ${Math.min(100, Math.max(0, pts*10))}%"></div></div></div>`; });
         }
         
         const cv = document.getElementById('confetti-canvas'); 
