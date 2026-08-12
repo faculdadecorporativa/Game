@@ -1,90 +1,61 @@
 // ModuleTwo.js
-// 🏗️ Web Component for the Drag and Drop Concept Matching Module (Strict Dual-Mode Framework)
+// Web Component for the PvP Puzzle Reveal Module
 
 export class ModuleTwo extends HTMLElement {
     
     connectedCallback() {
+        this.classList.remove('max-w-4xl');
+        this.classList.add('w-full');
         this.render();
     }
 
     render() {
         this.innerHTML = `
-            <style>
-                /* =========================================================
-                   CONCEPT MATCHING: DUAL-MODE UI 
-                   ========================================================= */
-
-                /* 1. DRAGGABLE TERMS */
-                #drag-terms-container > div {
-                    /* Light Mode: Solid White Cards */
-                    background-color: #ffffff !important;
-                    border: 1px solid #cbd5e1 !important; /* slate-300 */
-                    color: #1e293b !important; /* slate-800 */
-                    border-radius: 0.75rem !important;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-                    transition: all 0.3s ease !important;
-                    backdrop-filter: none !important;
-                    -webkit-backdrop-filter: none !important;
-                }
-                .dark #drag-terms-container > div {
-                    /* Dark Mode: Premium tinted glass */
-                    background-color: rgba(30, 30, 40, 0.5) !important;
-                    border: 1px solid rgba(99, 102, 241, 0.4) !important; /* Indigo border */
-                    color: #ffffff !important;
-                    backdrop-filter: blur(16px) !important;
-                    -webkit-backdrop-filter: blur(16px) !important;
-                }
-                
-                /* 2. DROPPED / MATCHED STATE INSIDE DROPZONE */
-                #dropzone > div {
-                    /* Light Mode: Solid White with Universal Success Green Text */
-                    background-color: #ffffff !important;
-                    border: 1px solid #e2e8f0 !important;
-                    border-radius: 0.75rem !important;
-                    font-weight: bold !important;
-                    color: #22c55e !important; /* Forces the vibrant success green text */
-                    box-shadow: 0 4px 10px rgba(34, 197, 94, 0.1) !important; /* Soft green glow */
-                }
-                .dark #dropzone > div {
-                    /* Dark Mode: Indigo glass for matched term */
-                    background-color: rgba(79, 70, 229, 0.3) !important; 
-                    border: 1px solid rgba(99, 102, 241, 0.6) !important;
-                    color: #ffffff !important;
-                    box-shadow: 0 0 15px rgba(79, 70, 229, 0.4) !important;
-                }
-                
-                /* 3. EMPTY DROPZONE BORDER */
-                /* Light Mode (handled by Tailwind below) */
-                
-                /* Dark Mode Fix */
-                .dark #dropzone {
-                    border-color: rgba(255, 255, 255, 0.15) !important;
-                    background-color: rgba(0, 0, 0, 0.2) !important;
-                }
-            </style>
-
+            <!-- Changed blur-md to nothing, kept scale-105 -->
             <span class="text-indigo-600 dark:text-white font-bold tracking-wider uppercase text-sm transition-colors duration-300">Module 2 of 11</span>
-            <h2 class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 mb-6 transition-colors duration-300">Concept Matching</h2>
+            <h2 class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 mb-6 transition-colors duration-300">PvP Puzzle Race</h2>
             
             <div id="lifeline-mount-2"></div>
             
-            <!-- CONTAINER: Solid White in Light Mode, Frosted Glass in Dark Mode -->
-            <div class="flex flex-col md:flex-row gap-8 bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl p-6 rounded-3xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 max-w-4xl mx-auto relative transition-all duration-300">
+            <div class="bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl p-6 md:p-10 rounded-3xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 relative overflow-hidden transition-all duration-300 w-full max-w-5xl mx-auto">
                 
-                <!-- Left Side: Draggable Terms -->
-                <div class="md:w-1/3 border-r border-slate-200 dark:border-white/10 pr-6 flex flex-col gap-3 transition-colors duration-300" id="drag-terms-container"></div>
-                
-                <!-- Right Side: Dropzone -->
-                <div class="md:w-2/3 flex flex-col justify-center items-center relative">
-                    <span class="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest block mb-2 transition-colors duration-300" id="dnd-progress"></span>
-                    <h3 class="text-xl font-semibold text-slate-800 dark:text-white mb-6 transition-colors duration-300" id="drop-definition-text"></h3>
-                    
-                    <div id="dropzone" class="dropzone w-full max-w-sm h-32 border-4 border-dashed border-slate-300 dark:border-white/20 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-300 font-medium bg-slate-50 dark:bg-white/5 transition-colors duration-300">
-                        Drop term here
+                <!-- 🔥 PvP Player Header 🔥 -->
+                <div id="puzzle-matchup-header" class="flex justify-between items-center bg-slate-100 dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-white/5 mb-6 shadow-sm">
+                    <div class="flex flex-col items-center w-1/3">
+                        <span class="text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-1">Player 1</span>
+                        <span id="puzzle-player-1" class="font-black text-lg md:text-2xl text-slate-800 dark:text-white truncate w-full text-center">Waiting...</span>
                     </div>
-                    
-                    <div id="dnd-feedback" class="mt-4 font-bold text-xl opacity-0 transition-opacity absolute bottom-[-40px] w-full text-center"></div>
+                    <div class="text-3xl md:text-5xl font-black text-slate-300 dark:text-slate-600 italic px-2">VS</div>
+                    <div class="flex flex-col items-center w-1/3">
+                        <span class="text-xs font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400 mb-1">Player 2</span>
+                        <span id="puzzle-player-2" class="font-black text-lg md:text-2xl text-slate-800 dark:text-white truncate w-full text-center">Waiting...</span>
+                    </div>
                 </div>
+
+                <!-- 🔥 Game Status Indicator 🔥 -->
+                <div id="puzzle-status" class="text-center font-black text-xl md:text-2xl text-indigo-600 dark:text-indigo-400 mb-8 animate-pulse uppercase tracking-widest">
+                    Waiting for Matchmaking...
+                </div>
+
+                <!-- 🔥 Dynamic Puzzle Grid Container 🔥 -->
+                <div class="relative w-full aspect-video max-h-[60vh] mx-auto rounded-3xl overflow-hidden border-4 border-slate-300 dark:border-white/20 shadow-2xl bg-slate-200 dark:bg-slate-800">
+                    <!-- Background Image (Target Image) -->
+                    <div id="puzzle-bg-img" class="absolute inset-0 bg-cover bg-center z-0 transition-all duration-500 scale-105"></div>
+                    
+                    <!-- Frosted Glass Tiles Overlay (Injected dynamically by UIController) -->
+                    <div id="puzzle-board" class="absolute inset-0 z-10 pointer-events-none opacity-50 transition-all duration-300">
+                        <!-- UIController.js will inject the exact number of grid cells here (4, 9, or 16) -->
+                    </div>
+                </div>
+
+                <!-- 🔥 Pop-Up Question Overlay 🔥 -->
+                <div id="puzzle-question-overlay" class="absolute inset-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl z-20 flex flex-col items-center justify-center p-6 md:p-12 hidden opacity-0 transition-opacity duration-300 rounded-3xl">
+                    <h3 id="puzzle-q-text" class="text-2xl md:text-4xl font-bold text-slate-900 dark:text-white mb-10 text-center leading-tight">Question goes here?</h3>
+                    <div id="puzzle-options" class="w-full max-w-2xl space-y-4 grid grid-cols-1 gap-4">
+                        <!-- Options injected by UIController.js -->
+                    </div>
+                </div>
+
             </div>
         `;
     }

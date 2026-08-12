@@ -1,101 +1,33 @@
 // ModuleOne.js
-// 🏗️ Concept Mastery Web Component (Strict Dual-Mode Framework)
+// 🏗️ Concept Mastery Web Component (Premium Glassmorphism Edition)
 
 export class ModuleOne extends HTMLElement {
     connectedCallback() {
+        this.classList.remove('max-w-4xl');
+        this.classList.add('w-full');
         this.render();
     }
 
     render() {
         this.innerHTML = `
-            <style>
-                /* =========================================================
-                   FLASHCARD FLIP FACES: DUAL-MODE UI 
-                   ========================================================= */
-                   
-                /* 1. DEFAULT STATE (Light Mode) */
-                #flashcards-container .flip-card-front,
-                #flashcards-container .flip-card-back,
-                #flashcards-container > div > div > div {
-                    /* Light Mode: Clean solid background, crisp borders */
-                    background-color: #ffffff !important;
-                    border: 1px solid #e2e8f0 !important; 
-                    border-radius: 1rem !important;
-                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-                    backdrop-filter: none !important;
-                    -webkit-backdrop-filter: none !important;
-                }
-                
-                /* 2. DARK MODE STATE */
-                .dark #flashcards-container .flip-card-front,
-                .dark #flashcards-container .flip-card-back,
-                .dark #flashcards-container > div > div > div {
-                    /* Dark Mode: Premium tinted glass with neon border */
-                    background-color: rgba(30, 30, 40, 0.6) !important; 
-                    border: 1px solid rgba(99, 102, 241, 0.3) !important;
-                    box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
-                    backdrop-filter: blur(16px) !important;
-                    -webkit-backdrop-filter: blur(16px) !important;
-                }
-                
-                /* =========================================================
-                   TYPOGRAPHY DYNAMIC SHIFTING
-                   ========================================================= */
-                   
-                /* Light Mode Text: Force dark readable text */
-                #flashcards-container [class*="text-indigo-"],
-                #flashcards-container [class*="text-slate-"],
-                #flashcards-container [class*="text-blue-"],
-                #flashcards-container h2,
-                #flashcards-container h3,
-                #flashcards-container p,
-                #flashcards-container span {
-                    color: #1e293b !important;
-                }
-
-                /* Dark Mode Text: Force pure white text */
-                .dark #flashcards-container [class*="text-indigo-"],
-                .dark #flashcards-container [class*="text-slate-"],
-                .dark #flashcards-container [class*="text-blue-"],
-                .dark #flashcards-container h2,
-                .dark #flashcards-container h3,
-                .dark #flashcards-container p,
-                .dark #flashcards-container span {
-                    color: #ffffff !important;
-                }
-                
-                /* =========================================================
-                   INNER BUTTONS (Listen/Audio)
-                   ========================================================= */
-                   
-                /* Light Mode Buttons */
-                #flashcards-container button {
-                    background-color: #f1f5f9 !important; /* Soft slate gray */
-                    color: #1e293b !important;
-                    border: 1px solid #cbd5e1 !important;
-                    transition: all 0.2s ease !important;
-                }
-                #flashcards-container button:hover {
-                    background-color: #e2e8f0 !important;
-                }
-
-                /* Dark Mode Buttons */
-                .dark #flashcards-container button {
-                    background-color: rgba(79, 70, 229, 0.8) !important; /* Indigo soft button */
-                    color: #ffffff !important;
-                    border: none !important;
-                }
-                .dark #flashcards-container button:hover {
-                    background-color: rgba(67, 56, 202, 1) !important;
-                }
-            </style>
-            
-            <!-- TYPOGRAPHY: Dynamic color shifting for section headers -->
             <span class="text-indigo-600 dark:text-white font-bold tracking-wider uppercase text-sm transition-colors duration-300">Module 1 of 11</span>
             <h2 class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 mb-6 transition-colors duration-300">Concept Mastery</h2>
             
-            <div id="flashcards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10"></div>
+            <div id="lifeline-mount-1"></div>
+            
+            <!-- 🔥 Unified Premium Glassmorphism Wrapper 🔥 -->
+            <div class="bg-white/90 dark:bg-slate-900/40 backdrop-blur-2xl p-6 md:p-10 rounded-3xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 relative overflow-hidden transition-all duration-300 w-full max-w-6xl mx-auto">
+                
+                <div class="flex justify-between items-center mb-6 border-b border-slate-200 dark:border-white/10 pb-4 transition-colors duration-300">
+                    <span class="text-sm md:text-base font-black text-slate-600 dark:text-slate-300 transition-colors duration-300 tracking-wider uppercase">Study Mode</span>
+                    <span class="text-xs md:text-sm font-black text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-500/30 px-3 py-1.5 rounded-full shadow-sm transition-colors duration-300">No Points</span>
+                </div>
+
+                <!-- Cards injected dynamically by UIController.js -->
+                <div id="flashcards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-4">
+                </div>
+                
+            </div>
         `;
     }
 }

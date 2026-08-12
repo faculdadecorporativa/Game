@@ -238,41 +238,65 @@ export class ProfDashboard extends HTMLElement {
                                 </div>
 
                                 <div class="bg-transparent mt-8">
-                                    <div class="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300"><h3 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Visual Assessment (Mod 3)</h3></div>
-                                    <input type="file" accept="image/*" class="w-full text-xs mb-3 text-slate-600 dark:text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-slate-100 dark:file:bg-white/10 file:text-slate-800 dark:file:text-slate-200 cursor-pointer transition-colors duration-300" onchange="adminUI.handleBgUpload(event, 'mod3-admin-bg', 'hotspot-bg')">
-                                    <div id="mod3-draw-container" class="relative w-full h-48 overflow-hidden border border-slate-300 dark:border-white/10 rounded-xl cursor-crosshair mb-3 select-none bg-slate-100 dark:bg-slate-900/50 transition-colors duration-300"><img id="mod3-admin-bg" src="https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&q=80" class="w-full h-full object-contain pointer-events-none"><div id="mod3-admin-layer" class="absolute inset-0"></div></div>
-                                    <div class="flex gap-2 mb-3"><input type="text" id="mod3-prompt-input" class="flex-1 text-sm p-2 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors duration-300" placeholder="Target Prompt..."><button onclick="adminUI.addDrawnHotspot(3)" class="bg-indigo-600 dark:bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white px-4 py-2 text-sm rounded-lg font-medium transition-colors duration-300">Add</button></div>
+                                    <div class="flex justify-between items-center mb-2 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">
+                                        <h3 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Visual Assessment (Mod 3)</h3>
+                                    </div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">1. Upload an image. 2. Click and drag on the image to draw a target zone. 3. Enter a prompt and click Add.</p>
+                                    
+                                    <input type="file" accept="image/*" class="w-full text-xs mb-4 text-slate-600 dark:text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-slate-100 dark:file:bg-white/10 file:text-slate-800 dark:file:text-slate-200 cursor-pointer transition-colors duration-300" onchange="adminUI.handleBgUpload(event, 'mod3-admin-bg', 'hotspot-bg')">
+                                    
+                                    <!-- 🔥 UPGRADED: Cinematic aspect-video container for accurate drawing 🔥 -->
+                                    <div id="mod3-draw-container" class="relative w-full aspect-video overflow-hidden border-2 border-indigo-400 dark:border-indigo-500/50 rounded-2xl cursor-crosshair mb-4 select-none bg-slate-100 dark:bg-slate-900/80 transition-all duration-300 shadow-inner">
+                                        <img id="mod3-admin-bg" src="https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&q=80" class="w-full h-full object-contain pointer-events-none">
+                                        <div id="mod3-admin-layer" class="absolute inset-0"></div>
+                                    </div>
+                                    
+                                    <div class="flex gap-2 mb-4">
+                                        <input type="text" id="mod3-prompt-input" class="flex-1 text-sm p-3 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors duration-300" placeholder="e.g., 'Find the red button...'">
+                                        <button onclick="adminUI.addDrawnHotspot(3)" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 text-sm rounded-lg font-bold shadow-md transition-colors duration-300">Add Target</button>
+                                    </div>
                                     <div id="admin-mod3-list" class="space-y-2"></div>
                                 </div>
 
                                 <div class="bg-transparent mt-8">
-                                    <div class="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300"><h3 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Where's Wally (Mod 8)</h3></div>
-                                    <input type="file" accept="image/*" class="w-full text-xs mb-3 text-slate-600 dark:text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-slate-100 dark:file:bg-white/10 file:text-slate-800 dark:file:text-slate-200 cursor-pointer transition-colors duration-300" onchange="adminUI.handleBgUpload(event, 'mod8-admin-bg', 'wally-bg')">
-                                    <div id="mod8-draw-container" class="relative w-full h-48 overflow-hidden border border-slate-300 dark:border-white/10 rounded-xl cursor-crosshair mb-3 select-none bg-slate-100 dark:bg-slate-900/50 transition-colors duration-300"><img id="mod8-admin-bg" src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80" class="w-full h-full object-contain pointer-events-none"><div id="mod8-admin-layer" class="absolute inset-0"></div></div>
-                                    <div class="flex gap-2 mb-3"><input type="text" id="mod8-prompt-input" class="flex-1 text-sm p-2 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors duration-300" placeholder="Target Prompt..."><button onclick="adminUI.addDrawnHotspot(8)" class="bg-indigo-600 dark:bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white px-4 py-2 text-sm rounded-lg font-medium transition-colors duration-300">Add</button></div>
-                                    <div id="admin-mod8-list" class="space-y-2"></div>
-                                </div>
-                            </div>
-
-                            <div class="space-y-8 pr-4">
-                                
-                                <div>
                                     <div class="flex justify-between items-center mb-3 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">
-                                        <h4 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Memory Match (Mod 4)</h4>
+                                        <h4 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Memory Match (Mod 8)</h4>
                                         <button onclick="adminUI.addItem('memoryMatch')" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">Add +</button>
                                     </div>
-                                    <select id="mod4-match-type" onchange="adminUI.renderContentEditors()" class="w-full mb-3 p-2 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 text-sm focus:border-indigo-500 transition-colors duration-300 text-slate-900 dark:text-slate-200">
+                                    <select id="mod8-match-type" onchange="adminUI.renderContentEditors()" class="w-full mb-3 p-2 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 text-sm focus:border-indigo-500 transition-colors duration-300 text-slate-900 dark:text-slate-200">
                                         <option value="text-text">&#128221; Text to Text</option>
                                         <option value="image-text">&#128444; Image to Text</option>
                                         <option value="image-image">&#128248; Image to Image</option>
                                     </select>
                                     <div id="admin-memory-list" class="space-y-3"></div>
                                 </div>
+                            </div>
 
+                            <div class="space-y-8 pr-4">
+                                
                                 <div>
-                                    <div class="flex justify-between items-center mb-3 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300"><h4 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Vocabulary (Mods 1, 2, 4)</h4><button onclick="adminUI.addItem('vocab')" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">Add +</button></div>
+                                    <div class="flex justify-between items-center mb-3 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300"><h4 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Vocabulary (Mod 1)</h4><button onclick="adminUI.addItem('vocab')" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">Add +</button></div>
                                     <div id="admin-vocab-list" class="space-y-3"></div>
                                 </div>
+
+                                <div>
+                                    <div class="flex justify-between items-center mb-3 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">
+                                        <h4 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">PvP Puzzle (Mod 2)</h4>
+                                        <button onclick="adminUI.addItem('puzzleMatch')" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">Add +</button>
+                                    </div>
+                                    <input type="file" accept="image/*" class="w-full text-xs mb-3 text-slate-600 dark:text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-slate-100 dark:file:bg-white/10 file:text-slate-800 dark:file:text-slate-200 cursor-pointer transition-colors duration-300" onchange="adminUI.handlePuzzleBgUpload(event)">
+                                    <div id="mod2-puzzle-preview" class="hidden w-full h-32 mb-3 rounded-lg bg-cover bg-center border border-slate-300 dark:border-white/20"></div>
+                                    <div id="admin-puzzle-list" class="space-y-3"></div>
+                                </div>
+
+                                <div>
+                                    <div class="flex justify-between items-center mb-3 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">
+                                        <h4 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Tic-Tac-Toe (Mod 4)</h4>
+                                        <button onclick="adminUI.addItem('ticTacToe')" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">Add +</button>
+                                    </div>
+                                    <div id="admin-tictactoe-list" class="space-y-3"></div>
+                                </div>
+
                                 <div>
                                     <div class="flex justify-between items-center mb-3 border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300"><h4 class="font-medium text-slate-800 dark:text-slate-200 text-sm tracking-wider uppercase transition-colors duration-300">Audio Guessing (Mod 5)</h4><button onclick="adminUI.addItem('audioGuess')" class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors duration-300">Add +</button></div>
                                     <div id="admin-audio-list" class="space-y-3"></div>
@@ -371,7 +395,6 @@ export class ProfDashboard extends HTMLElement {
                             </div>
                         </div>
 
-                        <!-- 🔥 NEW: Custom Team Creation UI 🔥 -->
                         <div class="bg-transparent w-full max-w-xl">
                             <h3 class="font-medium text-slate-800 dark:text-slate-200 mb-4 text-sm tracking-wider uppercase border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">Manage Custom Teams</h3>
                             <div class="flex gap-2 w-full mb-4">
@@ -405,12 +428,44 @@ export class ProfDashboard extends HTMLElement {
                                     <input type="text" id="manual-student-name" placeholder="Full Name" class="flex-1 w-full p-2.5 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 font-light text-sm text-slate-900 dark:text-white transition-colors duration-300">
                                     
                                     <div class="flex-1 w-full flex gap-2">
-                                        <select id="manual-student-cc" class="p-2.5 rounded-lg w-24 text-xs font-mono bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-200 transition-colors duration-300">
+                                        <select id="manual-student-cc" class="p-2.5 rounded-lg w-24 text-xs font-mono bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-200 transition-colors duration-300 custom-scrollbar">
                                             <option value="" disabled selected>Code</option>
                                             <optgroup label="North America">
                                                 <option value="+1">CA +1</option>
                                                 <option value="+52">MX +52</option>
                                                 <option value="+1">US +1</option>
+                                            </optgroup>
+                                            <optgroup label="Central America">
+                                                <option value="+501">BZ +501</option>
+                                                <option value="+506">CR +506</option>
+                                                <option value="+502">GT +502</option>
+                                                <option value="+504">HN +504</option>
+                                                <option value="+505">NI +505</option>
+                                                <option value="+507">PA +507</option>
+                                                <option value="+503">SV +503</option>
+                                            </optgroup>
+                                            <optgroup label="South America">
+                                                <option value="+54">AR +54</option>
+                                                <option value="+591">BO +591</option>
+                                                <option value="+55">BR +55</option>
+                                                <option value="+56">CL +56</option>
+                                                <option value="+57">CO +57</option>
+                                                <option value="+593">EC +593</option>
+                                                <option value="+592">GY +592</option>
+                                                <option value="+51">PE +51</option>
+                                                <option value="+595">PY +595</option>
+                                                <option value="+597">SR +597</option>
+                                                <option value="+598">UY +598</option>
+                                                <option value="+58">VE +58</option>
+                                            </optgroup>
+                                            <optgroup label="Caribbean">
+                                                <option value="+1">BS +1</option>
+                                                <option value="+53">CU +53</option>
+                                                <option value="+1">DO +1</option>
+                                                <option value="+509">HT +509</option>
+                                                <option value="+1">JM +1</option>
+                                                <option value="+1">PR +1</option>
+                                                <option value="+1">TT +1</option>
                                             </optgroup>
                                         </select>
                                         <input type="tel" id="manual-student-phone" placeholder="Phone" class="w-full p-2.5 rounded-lg bg-white dark:bg-black/30 border border-slate-300 dark:border-white/20 focus:border-indigo-500 dark:focus:border-indigo-400 font-light text-sm text-slate-900 dark:text-white transition-colors duration-300">

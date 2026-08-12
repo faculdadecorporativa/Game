@@ -22,14 +22,15 @@ export const adminUI = {
         }
 
         this.renderContentEditors(); 
+        
+        // 🔥 FIX: The drawing board will now successfully initialize!
         this.setupDrawingBoard('mod3-draw-container'); 
-        this.setupDrawingBoard('mod8-draw-container'); 
+        
         this.renderTeams(); 
         this.renderStudentManagement(); 
         this.updateLobbyList();
     },
 
-    // 🔥 NEW: Unified Team Helper to support both Legacy and Custom Teams seamlessly 🔥
     getTeamDetails(teamId) {
         const customTeams = appStore.get('teams') || [];
         const found = customTeams.find(t => t.id === teamId);
@@ -44,7 +45,9 @@ export const adminUI = {
     deleteItem(type, index) {
         if (!window.lessonData) return;
         
+        if (type === 'ticTacToe' && window.lessonData.ticTacToe) window.lessonData.ticTacToe.splice(index, 1);
         if (type === 'memoryMatch' && window.lessonData.memoryMatch) window.lessonData.memoryMatch.splice(index, 1);
+        if (type === 'puzzleMatch' && window.lessonData.puzzleMatch && window.lessonData.puzzleMatch.questions) window.lessonData.puzzleMatch.questions.splice(index, 1);
         if (type === 'chatPhrase' && window.lessonData.chatPhrases) window.lessonData.chatPhrases.splice(index, 1);
         if (type === 'vocab' && window.lessonData.vocabulary) window.lessonData.vocabulary.splice(index, 1);
         if (type === 'audioGuess' && window.lessonData.audioGuess) window.lessonData.audioGuess.splice(index, 1);
@@ -54,7 +57,6 @@ export const adminUI = {
         if (type === 'dictation' && window.lessonData.dictation) window.lessonData.dictation.splice(index, 1);
         if (type === 'quiz' && window.lessonData.quiz) window.lessonData.quiz.splice(index, 1);
         if (type === 'hotspot' && window.lessonData.hotspots) window.lessonData.hotspots.splice(index, 1);
-        if (type === 'wally' && window.lessonData.wally) window.lessonData.wally.splice(index, 1);
         
         this.renderContentEditors();
     },
@@ -146,6 +148,32 @@ export const adminUI = {
         reader.readAsDataURL(file);
     },
 
+    compressBackgroundImage(file, callback) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1200; 
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > MAX_WIDTH) {
+                    height = Math.round(height * (MAX_WIDTH / width));
+                    width = MAX_WIDTH;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                callback(canvas.toDataURL('image/jpeg', 0.8)); 
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    },
+
     handleProfAvatar(e) {
         const f = e.target.files[0];
         if(f) {
@@ -183,6 +211,37 @@ export const adminUI = {
                 window.lessonData.memoryMatch[idx][key] = compressedData;
             });
         }
+    },
+
+    handlePuzzleBgUpload(e) { 
+        const f = e.target.files[0]; 
+        if(f) { 
+            this.compressBackgroundImage(f, (compressedData) => {
+                if(!window.lessonData.puzzleMatch) window.lessonData.puzzleMatch = { questions: [] };
+                window.lessonData.puzzleMatch.image = compressedData; 
+                this.renderContentEditors();
+            });
+        } 
+    },
+    
+    // 🔥 FIX: Properly saves the Mod 3 Image to the Database Payload!
+    handleBgUpload(e, imgId, destId) { 
+        const f = e.target.files[0]; 
+        if(f) { 
+            this.compressBackgroundImage(f, (compressedData) => {
+                const imgEl = document.getElementById(imgId);
+                if (imgEl) imgEl.src = compressedData; 
+                
+                const destEl = document.getElementById(destId);
+                if(destEl) destEl.src = compressedData; 
+                
+                if(!window.lessonData.visualAssessment) window.lessonData.visualAssessment = {};
+                window.lessonData.visualAssessment.image = compressedData;
+                
+                this.renderContentEditors();
+                window.toast("Image loaded and saved!", true);
+            });
+        } 
     },
 
     updateStudentAvatar(e, phone) { 
@@ -704,49 +763,121 @@ export const adminUI = {
         }
     },
     
-    handleBgUpload(e, imgId, destId) { 
-        const f = e.target.files[0]; 
-        if(f) { 
-            const r = new FileReader(); 
-            r.onload = ev => { 
-                document.getElementById(imgId).src = ev.target.result; 
-                if(destId) document.getElementById(destId).src = ev.target.result; 
-            }; 
-            r.readAsDataURL(f); 
-        } 
-    },
-    
-    setupDrawingBoard(cId) {
-        const c = document.getElementById(cId); let isDraw=false, sX, sY, box;
-        if(!c) return;
-        c.onmousedown = (e) => { 
-            isDraw=true; const r = c.getBoundingClientRect(); sX = e.clientX - r.left; sY = e.clientY - r.top; 
-            if(box) box.remove(); box = document.createElement('div'); box.className='draw-box'; box.style.left=sX+'px'; box.style.top=sY+'px'; c.querySelector('div').appendChild(box); 
-        };
+    // 🔥 NEW: Premium Drawing Board Logic for Visual Assessment 🔥
+    setupDrawingBoard(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const layer = container.querySelector('#mod3-admin-layer');
+        let isDrawing = false;
+        let startX, startY, currentBox;
+
+        container.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            const rect = container.getBoundingClientRect();
+            startX = ((e.clientX - rect.left) / rect.width) * 100;
+            startY = ((e.clientY - rect.top) / rect.height) * 100;
+
+            if (currentBox) currentBox.remove();
+            
+            currentBox = document.createElement('div');
+            // Premium glowing selection box
+            currentBox.className = 'draw-box absolute border-4 border-rose-500 bg-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.6)] rounded-sm pointer-events-none';
+            currentBox.style.left = `${startX}%`;
+            currentBox.style.top = `${startY}%`;
+            currentBox.style.width = '0%';
+            currentBox.style.height = '0%';
+            layer.appendChild(currentBox);
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const rect = container.getBoundingClientRect();
+            let currX = ((e.clientX - rect.left) / rect.width) * 100;
+            let currY = ((e.clientY - rect.top) / rect.height) * 100;
+
+            currX = Math.max(0, Math.min(100, currX));
+            currY = Math.max(0, Math.min(100, currY));
+
+            const left = Math.min(startX, currX);
+            const top = Math.min(startY, currY);
+            const width = Math.abs(currX - startX);
+            const height = Math.abs(currY - startY);
+
+            currentBox.style.left = `${left}%`;
+            currentBox.style.top = `${top}%`;
+            currentBox.style.width = `${width}%`;
+            currentBox.style.height = `${height}%`;
+            
+            container.dataset.box = JSON.stringify({ left, top, width, height });
+        });
+
+        container.addEventListener('mouseup', () => { isDrawing = false; });
+        container.addEventListener('mouseleave', () => { isDrawing = false; });
     },
     
     addDrawnHotspot(modNum) {
-        const cId = modNum === 3 ? 'mod3-draw-container' : 'mod8-draw-container'; const iId = modNum === 3 ? 'mod3-prompt-input' : 'mod8-prompt-input';
+        const cId = 'mod3-draw-container'; 
+        const iId = 'mod3-prompt-input';
         const c = document.getElementById(cId); const i = document.getElementById(iId); if(!c || !c.dataset.box || !i.value) return;
         const target = JSON.parse(c.dataset.box); 
-        if(modNum === 3) window.lessonData.hotspots.push({ prompt: i.value, target }); 
-        if(modNum === 8) window.lessonData.wally.push({ prompt: i.value, target });
-        i.value = ''; c.dataset.box = ''; const b = c.querySelector('.draw-box'); if(b) b.remove(); this.renderContentEditors();
+        
+        if(!window.lessonData.hotspots) window.lessonData.hotspots = [];
+        window.lessonData.hotspots.push({ prompt: i.value, target }); 
+        
+        i.value = ''; c.dataset.box = ''; const b = c.querySelector('.draw-box'); if(b) b.remove(); 
+        
+        this.renderContentEditors();
+        window.toast("Target added successfully!", true);
     },
     
     addItem(type) {
+        if (!window.lessonData) window.lessonData = {};
+        
+        if(type==='puzzleMatch') {
+            if(!window.lessonData.puzzleMatch) window.lessonData.puzzleMatch = { image: "", questions: [] };
+            if(!window.lessonData.puzzleMatch.questions) window.lessonData.puzzleMatch.questions = [];
+            window.lessonData.puzzleMatch.questions.push({ q: "New Question?", options: ["Option 1", "Option 2", "Option 3", "Option 4"], answer: 0, skill: "General" });
+        }
+        if(type==='ticTacToe') {
+            if(!window.lessonData.ticTacToe) window.lessonData.ticTacToe = [];
+            window.lessonData.ticTacToe.push({ q: "New Question?", options: ["Option 1", "Option 2", "Option 3", "Option 4"], answer: 0, skill: "General" });
+        }
         if(type==='memoryMatch') {
             if(!window.lessonData.memoryMatch) window.lessonData.memoryMatch = [];
             window.lessonData.memoryMatch.push({term: "Term", match: "Match", termImg: "", matchImg: ""});
         }
-        if(type==='vocab') window.lessonData.vocabulary.push({term: "Term", def: "Def"}); 
-        if(type==='audioGuess') window.lessonData.audioGuess.push({ desc: "New", options: ["1", "2", "3", "4"], answer: 0, skill: "Listening" }); 
-        if(type==='spellingBee') window.lessonData.spellingBee.push({ word: "New", skill: "Writing" }); 
-        if(type==='hangman') window.lessonData.hangman.push({ phrase: "NEW", skill: "General" }); 
-        if(type==='readAloud') window.lessonData.readAloud.push({text: "Text", skill: "Speaking"}); 
-        if(type==='dictation') window.lessonData.dictation.push({text: "Dict", skill: "Writing"}); 
-        if(type==='quiz') window.lessonData.quiz.push({ q: "Q", options: ["1", "2", "3", "4"], answer: 0, skill: "General" }); 
-        if(type==='chatPhrase') window.lessonData.chatPhrases.push("New Phrase!");
+        if(type==='vocab') {
+            if(!window.lessonData.vocabulary) window.lessonData.vocabulary = [];
+            window.lessonData.vocabulary.push({term: "Term", def: "Def"});
+        }
+        if(type==='audioGuess') {
+            if(!window.lessonData.audioGuess) window.lessonData.audioGuess = [];
+            window.lessonData.audioGuess.push({ desc: "New", options: ["1", "2", "3", "4"], answer: 0, skill: "Listening" }); 
+        }
+        if(type==='spellingBee') {
+            if(!window.lessonData.spellingBee) window.lessonData.spellingBee = [];
+            window.lessonData.spellingBee.push({ word: "New", skill: "Writing" }); 
+        }
+        if(type==='hangman') {
+            if(!window.lessonData.hangman) window.lessonData.hangman = [];
+            window.lessonData.hangman.push({ phrase: "NEW", skill: "General" }); 
+        }
+        if(type==='readAloud') {
+            if(!window.lessonData.readAloud) window.lessonData.readAloud = [];
+            window.lessonData.readAloud.push({text: "Text", skill: "Speaking"}); 
+        }
+        if(type==='dictation') {
+            if(!window.lessonData.dictation) window.lessonData.dictation = [];
+            window.lessonData.dictation.push({text: "Dict", skill: "Writing"}); 
+        }
+        if(type==='quiz') {
+            if(!window.lessonData.quiz) window.lessonData.quiz = [];
+            window.lessonData.quiz.push({ q: "Q", options: ["1", "2", "3", "4"], answer: 0, skill: "General" }); 
+        }
+        if(type==='chatPhrase') {
+            if(!window.lessonData.chatPhrases) window.lessonData.chatPhrases = [];
+            window.lessonData.chatPhrases.push("New Phrase!");
+        }
         this.renderContentEditors();
     },
     
@@ -755,9 +886,26 @@ export const adminUI = {
         
         const delBtn = (type, i) => `<button onclick="adminUI.deleteItem('${type}', ${i})" class="shrink-0 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/20 w-8 h-8 flex items-center justify-center rounded-lg font-bold transition-colors ml-2" title="Delete Item">X</button>`;
         
-        const memTypeSelect = document.getElementById('mod4-match-type');
+        const memTypeSelect = document.getElementById('mod8-match-type');
         const memType = memTypeSelect ? memTypeSelect.value : (window.lessonData.memoryMatchType || 'text-text');
         if (memTypeSelect) memTypeSelect.value = memType;
+
+        const puzzlePreview = document.getElementById('mod2-puzzle-preview');
+        if(puzzlePreview) {
+            if(window.lessonData.puzzleMatch && window.lessonData.puzzleMatch.image) {
+                puzzlePreview.style.backgroundImage = `url(${window.lessonData.puzzleMatch.image})`;
+                puzzlePreview.classList.remove('hidden');
+            } else {
+                puzzlePreview.classList.add('hidden');
+            }
+        }
+        
+        const mod3Preview = document.getElementById('mod3-admin-bg');
+        if(mod3Preview && window.lessonData.visualAssessment && window.lessonData.visualAssessment.image) {
+            mod3Preview.src = window.lessonData.visualAssessment.image;
+        }
+        
+        _r('admin-puzzle-list', (window.lessonData.puzzleMatch && window.lessonData.puzzleMatch.questions) ? window.lessonData.puzzleMatch.questions : [], (t, i) => `<div class="flex items-start gap-2 pb-2 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1 flex flex-col gap-1"><input type="text" class="puz-q p-2 border border-slate-300 dark:border-white/20 rounded text-xs bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${t.q}" data-idx="${i}"><div class="grid grid-cols-2 gap-1">${t.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="puz-ans-${i}" value="${oIdx}" ${t.answer === oIdx ? 'checked' : ''}><input type="text" class="puz-opt text-[10px] p-2 border border-slate-300 dark:border-white/20 rounded w-full bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>${delBtn('puzzleMatch', i)}</div>`);
         
         _r('admin-memory-list', window.lessonData.memoryMatch || [], (m, i) => {
             let html = '<div class="flex items-center gap-2 pb-3 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1">';
@@ -789,6 +937,8 @@ export const adminUI = {
             return html;
         });
 
+        _r('admin-tictactoe-list', window.lessonData.ticTacToe || [], (t, i) => `<div class="flex items-start gap-2 pb-2 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1 flex flex-col gap-1"><input type="text" class="ttt-q p-2 border border-slate-300 dark:border-white/20 rounded text-xs bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${t.q}" data-idx="${i}"><div class="grid grid-cols-2 gap-1">${t.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="ttt-ans-${i}" value="${oIdx}" ${t.answer === oIdx ? 'checked' : ''}><input type="text" class="ttt-opt text-[10px] p-2 border border-slate-300 dark:border-white/20 rounded w-full bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>${delBtn('ticTacToe', i)}</div>`);
+
         _r('admin-chat-list', window.lessonData.chatPhrases || [], (d,i) => `<div class="flex items-center gap-1 pb-1 w-full"><input class="chat-phr text-xs p-2 flex-1 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${d}">${delBtn('chatPhrase', i)}</div>`);
         _r('admin-vocab-list', window.lessonData.vocabulary || [], (d,i) => `<div class="flex items-center gap-1 pb-1 w-full"><input class="v-term text-xs p-2 w-1/3 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${d.term}"><input class="v-def text-xs p-2 flex-1 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}" value="${d.def}">${delBtn('vocab', i)}</div>`);
         _r('admin-audio-list', window.lessonData.audioGuess || [], (a, i) => `<div class="flex items-start gap-2 pb-2 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1 flex flex-col gap-1"><textarea class="audio-desc p-2 border border-slate-300 dark:border-white/20 rounded text-xs h-10 bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}">${a.desc}</textarea><div class="grid grid-cols-2 gap-1">${a.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="audio-ans-${i}" value="${oIdx}" ${a.answer === oIdx ? 'checked' : ''}><input type="text" class="audio-opt text-[10px] p-2 border border-slate-300 dark:border-white/20 rounded w-full bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>${delBtn('audioGuess', i)}</div>`);
@@ -798,17 +948,28 @@ export const adminUI = {
         _r('admin-dict-list', window.lessonData.dictation || [], (d,i) => `<div class="flex items-start gap-1 w-full mb-1"><textarea class="dict-text w-full text-xs p-2 border border-slate-300 dark:border-white/20 rounded bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" data-idx="${i}">${d.text}</textarea>${delBtn('dictation', i)}</div>`);
         _r('admin-quiz-list', window.lessonData.quiz || [], (q, i) => `<div class="flex items-start gap-2 pb-2 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1 flex flex-col gap-1"><input type="text" class="quiz-q p-2 border border-slate-300 dark:border-white/20 rounded text-xs bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${q.q}" data-idx="${i}"><div class="grid grid-cols-2 gap-1">${q.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="quiz-ans-${i}" value="${oIdx}" ${q.answer === oIdx ? 'checked' : ''}><input type="text" class="quiz-opt text-[10px] p-2 border border-slate-300 dark:border-white/20 rounded w-full bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>${delBtn('quiz', i)}</div>`);
         _r('admin-mod3-list', window.lessonData.hotspots || [], (h, i) => `<div class="bg-white dark:bg-black/30 p-2 border border-slate-300 dark:border-white/20 rounded text-xs flex justify-between items-center text-slate-800 dark:text-slate-200 mb-1"><span>Target: ${h.prompt}</span>${delBtn('hotspot', i)}</div>`);
-        _r('admin-mod8-list', window.lessonData.wally || [], (w, i) => `<div class="bg-white dark:bg-black/30 p-2 border border-slate-300 dark:border-white/20 rounded text-xs flex justify-between items-center text-slate-800 dark:text-slate-200 mb-1"><span>Target: ${w.prompt}</span>${delBtn('wally', i)}</div>`);
     },
     
     saveContent() {
+        window.lessonData = window.lessonData || {};
+        
         const toggles = document.querySelectorAll('.module-toggle');
         if(toggles.length > 0) {
             window.lessonData.activeModules = Array.from(toggles).filter(cb => cb.checked).map(cb => parseInt(cb.dataset.mod));
         }
 
+        if(!window.lessonData.puzzleMatch) window.lessonData.puzzleMatch = { image: "", questions: [] };
+        if(!window.lessonData.puzzleMatch.questions) window.lessonData.puzzleMatch.questions = [];
+        document.querySelectorAll('.puz-q').forEach(i => {
+            if(window.lessonData.puzzleMatch.questions[i.dataset.idx]) window.lessonData.puzzleMatch.questions[i.dataset.idx].q = i.value;
+        }); 
+        document.querySelectorAll('.puz-opt').forEach(i => {
+            if(window.lessonData.puzzleMatch.questions[i.dataset.qidx]) window.lessonData.puzzleMatch.questions[i.dataset.qidx].options[i.dataset.oidx] = i.value;
+        }); 
+        window.lessonData.puzzleMatch.questions.forEach((t, idx) => { const s = document.querySelector(`input[name="puz-ans-${idx}"]:checked`); if(s) t.answer = parseInt(s.value); });
+
         if(!window.lessonData.memoryMatch) window.lessonData.memoryMatch = [];
-        const memTypeSelect = document.getElementById('mod4-match-type');
+        const memTypeSelect = document.getElementById('mod8-match-type');
         if(memTypeSelect) window.lessonData.memoryMatchType = memTypeSelect.value;
         
         document.querySelectorAll('.mem-term').forEach(e => {
@@ -818,15 +979,72 @@ export const adminUI = {
             if(window.lessonData.memoryMatch[e.dataset.idx]) window.lessonData.memoryMatch[e.dataset.idx].match = e.value;
         });
 
-        if(!window.lessonData.chatPhrases) window.lessonData.chatPhrases = []; document.querySelectorAll('.chat-phr').forEach(i => window.lessonData.chatPhrases[i.dataset.idx] = i.value);
-        document.querySelectorAll('.v-term').forEach(e => window.lessonData.vocabulary[e.dataset.idx].term = e.value); document.querySelectorAll('.v-def').forEach(e => window.lessonData.vocabulary[e.dataset.idx].def = e.value);
-        document.querySelectorAll('.audio-desc').forEach(i => window.lessonData.audioGuess[i.dataset.idx].desc = i.value); document.querySelectorAll('.audio-opt').forEach(i => window.lessonData.audioGuess[i.dataset.qidx].options[i.dataset.oidx] = i.value); window.lessonData.audioGuess.forEach((a, idx) => { const s = document.querySelector(`input[name="audio-ans-${idx}"]:checked`); if(s) a.answer = parseInt(s.value); });
-        document.querySelectorAll('.spell-word').forEach(e => window.lessonData.spellingBee[e.dataset.idx].word = e.value); document.querySelectorAll('.hangman-phrase').forEach(e => window.lessonData.hangman[e.dataset.idx].phrase = e.value.toUpperCase());
-        document.querySelectorAll('.ra-text').forEach(e => window.lessonData.readAloud[e.dataset.idx].text = e.value); document.querySelectorAll('.dict-text').forEach(e => window.lessonData.dictation[e.dataset.idx].text = e.value);
-        document.querySelectorAll('.quiz-q').forEach(i => window.lessonData.quiz[i.dataset.idx].q = i.value); document.querySelectorAll('.quiz-opt').forEach(i => window.lessonData.quiz[i.dataset.qidx].options[i.dataset.oidx] = i.value); window.lessonData.quiz.forEach((q, idx) => { const s = document.querySelector(`input[name="quiz-ans-${idx}"]:checked`); if(s) q.answer = parseInt(s.value); });
+        if(!window.lessonData.ticTacToe) window.lessonData.ticTacToe = [];
+        document.querySelectorAll('.ttt-q').forEach(i => {
+            if(window.lessonData.ticTacToe[i.dataset.idx]) window.lessonData.ticTacToe[i.dataset.idx].q = i.value;
+        }); 
+        document.querySelectorAll('.ttt-opt').forEach(i => {
+            if(window.lessonData.ticTacToe[i.dataset.qidx]) window.lessonData.ticTacToe[i.dataset.qidx].options[i.dataset.oidx] = i.value;
+        }); 
+        window.lessonData.ticTacToe.forEach((t, idx) => { const s = document.querySelector(`input[name="ttt-ans-${idx}"]:checked`); if(s) t.answer = parseInt(s.value); });
+
+        if(!window.lessonData.chatPhrases) window.lessonData.chatPhrases = []; 
+        document.querySelectorAll('.chat-phr').forEach(i => window.lessonData.chatPhrases[i.dataset.idx] = i.value);
+
+        if(!window.lessonData.vocabulary) window.lessonData.vocabulary = [];
+        document.querySelectorAll('.v-term').forEach(e => {
+            if(window.lessonData.vocabulary[e.dataset.idx]) window.lessonData.vocabulary[e.dataset.idx].term = e.value;
+        }); 
+        document.querySelectorAll('.v-def').forEach(e => {
+            if(window.lessonData.vocabulary[e.dataset.idx]) window.lessonData.vocabulary[e.dataset.idx].def = e.value;
+        });
+
+        if(!window.lessonData.audioGuess) window.lessonData.audioGuess = [];
+        document.querySelectorAll('.audio-desc').forEach(i => {
+            if(window.lessonData.audioGuess[i.dataset.idx]) window.lessonData.audioGuess[i.dataset.idx].desc = i.value;
+        }); 
+        document.querySelectorAll('.audio-opt').forEach(i => {
+            if(window.lessonData.audioGuess[i.dataset.qidx]) window.lessonData.audioGuess[i.dataset.qidx].options[i.dataset.oidx] = i.value;
+        }); 
+        window.lessonData.audioGuess.forEach((a, idx) => { const s = document.querySelector(`input[name="audio-ans-${idx}"]:checked`); if(s) a.answer = parseInt(s.value); });
+
+        if(!window.lessonData.spellingBee) window.lessonData.spellingBee = [];
+        document.querySelectorAll('.spell-word').forEach(e => {
+            if(window.lessonData.spellingBee[e.dataset.idx]) window.lessonData.spellingBee[e.dataset.idx].word = e.value;
+        }); 
+
+        if(!window.lessonData.hangman) window.lessonData.hangman = [];
+        document.querySelectorAll('.hangman-phrase').forEach(e => {
+            if(window.lessonData.hangman[e.dataset.idx]) window.lessonData.hangman[e.dataset.idx].phrase = e.value.toUpperCase();
+        });
+
+        if(!window.lessonData.readAloud) window.lessonData.readAloud = [];
+        document.querySelectorAll('.ra-text').forEach(e => {
+            if(window.lessonData.readAloud[e.dataset.idx]) window.lessonData.readAloud[e.dataset.idx].text = e.value;
+        }); 
+
+        if(!window.lessonData.dictation) window.lessonData.dictation = [];
+        document.querySelectorAll('.dict-text').forEach(e => {
+            if(window.lessonData.dictation[e.dataset.idx]) window.lessonData.dictation[e.dataset.idx].text = e.value;
+        });
+
+        if(!window.lessonData.quiz) window.lessonData.quiz = [];
+        document.querySelectorAll('.quiz-q').forEach(i => {
+            if(window.lessonData.quiz[i.dataset.idx]) window.lessonData.quiz[i.dataset.idx].q = i.value;
+        }); 
+        document.querySelectorAll('.quiz-opt').forEach(i => {
+            if(window.lessonData.quiz[i.dataset.qidx]) window.lessonData.quiz[i.dataset.qidx].options[i.dataset.oidx] = i.value;
+        }); 
+        window.lessonData.quiz.forEach((q, idx) => { const s = document.querySelector(`input[name="quiz-ans-${idx}"]:checked`); if(s) q.answer = parseInt(s.value); });
         
         authManager.saveDB(window.lessonData, 'lessonData');
-        localStorage.setItem('profLessonData', JSON.stringify(window.lessonData));
-        window.toast("Lesson data saved globally!", true);
+        
+        try {
+            localStorage.setItem('profLessonData', JSON.stringify(window.lessonData));
+            window.toast("Lesson data saved globally!", true);
+        } catch (err) {
+            console.warn("Local storage full! Cloud save succeeded, but local cache skipped.", err);
+            window.toast("Lesson saved to cloud! (File too large for local cache)", true);
+        }
     }
 };
