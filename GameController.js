@@ -12,7 +12,7 @@ const GameConfig = [
     { type: 'audio', getTarget: (idx) => window.lessonData.audioGuess[idx] }, // Module 5
     { type: 'spelling', getTarget: (idx) => window.lessonData.spellingBee[idx] }, // Module 6
     { type: 'hangman', getTarget: (idx) => window.lessonData.hangman[idx] }, // Module 7
-    { type: 'memory', getTarget: () => window.lessonData.memoryMatch }, // Module 8 (MEMORY MATCH MOVED HERE)
+    { type: 'memory', getTarget: () => window.lessonData.memoryMatch }, // Module 8
     { type: 'readAloud', getTarget: (idx) => window.lessonData.readAloud[idx] }, // Module 9
     { type: 'dictation', getTarget: (idx) => window.lessonData.dictation[idx] }, // Module 10
     { type: 'quiz', getTarget: (idx) => window.lessonData.quiz[idx] } // Module 11
@@ -78,7 +78,7 @@ export const game = {
     
     startTimer(sec) { window.timerManager.start(); },
     
-    submitScore(points, skill, msg) {
+    async submitScore(points, skill, msg) {
         if(appStore.get('role') === 'host') { window.toast("Host test: " + msg, points > 0); window.uiManager.lockModule(); return; }
 
         window.timerManager.stop();
@@ -97,7 +97,7 @@ export const game = {
             
             if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
                 const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/extraLife`);
-                window.firebaseSet(userRef, me.inventory.extraLife);
+                await window.firebaseSet(userRef, me.inventory.extraLife);
             }
 
             points = 0;
@@ -136,7 +136,7 @@ export const game = {
                 
                 if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
                     const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/doubleCoins`);
-                    window.firebaseSet(userRef, me.inventory.doubleCoins);
+                    await window.firebaseSet(userRef, me.inventory.doubleCoins);
                 }
             }
 
@@ -154,7 +154,7 @@ export const game = {
         
         if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
             const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}`);
-            window.firebaseSet(userRef, me);
+            await window.firebaseSet(userRef, me);
         }
 
         window.uiManager.updateStudentHUD();
@@ -164,37 +164,32 @@ export const game = {
         if(hostConn) hostConn.send({ type: 'SCORE_UPDATE', id: appStore.get('peer').id, points, skill });
         window.toast(msg + ` (${points > 0 ? '+'+points : points} pts)`, points > 0 || msg.includes("Extra Life")); 
         
-        // 🔥 FIX: Prevent auto-locking for Puzzle(2), TicTacToe(4), and MemoryMatch(8) since they have multiple turns
+        // 🔥 MULTIPLAYER SYNC FIX: Purged local auto-advancing timeouts. 
+        // Students MUST wait for the Host to broadcast the next module via Firebase!
         if (appStore.get('currentModule') !== 2 && appStore.get('currentModule') !== 4 && appStore.get('currentModule') !== 8) {
             window.uiManager.lockModule();
-            setTimeout(() => {
-                let currentMod = appStore.get('currentModule');
-                if (currentMod < 11) window.game.startModule(currentMod + 1, 0);
-            }, 2000);
         }
     },
 
-    // 🔥 NEW: PVP PUZZLE RACE ENGINE (MOD 2) 🔥
+    // --- DYNAMIC PVP PUZZLE RACE ENGINE (MOD 2) ---
     initPuzzle(targetData) {
         if(appStore.get('role') === 'host') return; 
         
         let d = appStore.get('localGameData') || {};
         let puzData = targetData || window.lessonData?.puzzleMatch || {};
         
-        // 🔥 CRITICAL FIX: structuredClone perfectly preserves the array structure without the JSON bugs!
         let questions = structuredClone(puzData.questions || []);
         if (!questions || questions.length === 0) {
             questions = [{ q: "Did the Professor forget to add questions?", options: ["Yes", "No", "Maybe", "I don't know"], answer: 0 }];
         }
         
-        // Dynamic Grid Logic
         const count = questions.length;
         const gridSize = count >= 10 ? 4 : (count >= 5 ? 3 : 2);
         const totalTiles = gridSize * gridSize;
 
         d.puzGridSize = gridSize;
         d.puzBoard = new Array(totalTiles).fill(null);
-        d.puzTurn = 'P1'; // Student is always P1
+        d.puzTurn = 'P1'; 
         d.puzQuestions = shuffleArray([...questions]);
         d.puzP1Count = 0;
         d.puzP2Count = 0;
@@ -224,8 +219,7 @@ export const game = {
         
         let q = d.puzQuestions.pop();
         if(!q) {
-            // Safety refill from Deep Clone
-            let rawData = window.lessonData?.puzzleMatch?.questions || [{ q: "Recycling Questions...", options: ["A", "B", "C", "D"], answer: 0 }];
+            let rawData = window.lessonData?.puzzleMatch?.questions || [];
             if (rawData.length === 0) rawData = [{ q: "Recycling Questions...", options: ["A", "B", "C", "D"], answer: 0 }];
             d.puzQuestions = shuffleArray(structuredClone(rawData));
             q = d.puzQuestions.pop();
@@ -273,7 +267,6 @@ export const game = {
         
         if(emptySpots.length === 0) return; 
         
-        // Ghost AI has an 80% chance of getting the answer right
         const getsItRight = Math.random() < 0.8;
         if(getsItRight) {
             const spot = emptySpots[Math.floor(Math.random() * emptySpots.length)];
@@ -293,11 +286,10 @@ export const game = {
         d.puzTurn = 'P1';
         appStore.set('localGameData', d);
         window.uiManager.setPuzzleStatus(`Your Turn! Select a tile to reveal.`, true);
-        window.uiManager.unlockModule(); // Ensure screen unlocks for the player's next turn!
+        window.uiManager.unlockModule();
     },
 
     checkPuzzleWin(d) {
-        // Dynamic Win Logic based on Grid Size!
         const winTarget = d.puzGridSize === 4 ? 9 : (d.puzGridSize === 3 ? 5 : 3);
         
         if(d.puzP1Count >= winTarget) {
@@ -319,27 +311,22 @@ export const game = {
     endPuzzle() {
         window.uiManager.lockModule();
         window.timerManager.stop();
-        setTimeout(() => {
-            let currentMod = appStore.get('currentModule');
-            if (currentMod < 11) window.game.startModule(currentMod + 1, 0);
-        }, 4000);
+        // 🔥 MULTIPLAYER SYNC FIX: Removed local auto-advance. Wait for Professor.
     },
 
     handleHotspot(isHit) { if(isHit) this.submitScore(3, "General", "Found it!"); else this.submitScore(-1, "General", "Missed!"); },
     
-    // 🔥 NEW DYNAMIC TIC-TAC-TOE ENGINE 🔥
+    // --- DYNAMIC TIC-TAC-TOE ENGINE (MOD 4) ---
     initTicTacToe(targetData) {
         if(appStore.get('role') === 'host') return; 
         
         let d = appStore.get('localGameData') || {};
         
-        // 🔥 CRITICAL FIX: structuredClone safely copies arrays natively
         let tttData = structuredClone(targetData || window.lessonData?.ticTacToe || []);
         if (!tttData || tttData.length === 0) {
             tttData = [{ q: "Did the Professor forget to add questions?", options: ["Yes", "No", "Maybe", "I don't know"], answer: 0 }];
         }
         
-        // Dynamic Grid Logic
         const count = tttData.length;
         const gridSize = count >= 10 ? 4 : (count >= 5 ? 3 : 2);
         const totalTiles = gridSize * gridSize;
@@ -374,8 +361,7 @@ export const game = {
         
         let q = d.tttQuestions.pop();
         if(!q) {
-            // Safety refill from Deep Clone
-            let rawData = window.lessonData?.ticTacToe || [{ q: "Recycling Questions...", options: ["A", "B", "C", "D"], answer: 0 }];
+            let rawData = window.lessonData?.ticTacToe || [];
             if (rawData.length === 0) rawData = [{ q: "Recycling Questions...", options: ["A", "B", "C", "D"], answer: 0 }];
             d.tttQuestions = shuffleArray(structuredClone(rawData));
             q = d.tttQuestions.pop();
@@ -440,27 +426,23 @@ export const game = {
         d.tttTurn = 'X';
         appStore.set('localGameData', d);
         window.uiManager.setTTTStatus(`Your Turn! Select a square.`, true);
-        window.uiManager.unlockModule(); // Ensure screen unlocks for the player's next turn!
+        window.uiManager.unlockModule(); 
     },
 
-    // 🔥 COMPLETELY DYNAMIC WIN LOGIC (Handles 2x2, 3x3, and 4x4 boards automatically) 🔥
     checkTTTWin(board, lastPlayer) {
         const gridSize = Math.sqrt(board.length);
         let winCombos = [];
         
-        // Generate Rows
         for (let r=0; r<gridSize; r++) {
             let row = [];
             for (let c=0; c<gridSize; c++) row.push(r*gridSize + c);
             winCombos.push(row);
         }
-        // Generate Columns
         for (let c=0; c<gridSize; c++) {
             let col = [];
             for (let r=0; r<gridSize; r++) col.push(r*gridSize + c);
             winCombos.push(col);
         }
-        // Generate Diagonals
         let diag1 = [], diag2 = [];
         for (let i=0; i<gridSize; i++) {
             diag1.push(i*gridSize + i);
@@ -497,10 +479,7 @@ export const game = {
     endTicTacToe() {
         window.uiManager.lockModule();
         window.timerManager.stop();
-        setTimeout(() => {
-            let currentMod = appStore.get('currentModule');
-            if (currentMod < 11) window.game.startModule(currentMod + 1, 0);
-        }, 4000);
+        // 🔥 MULTIPLAYER SYNC FIX: Removed local auto-advance.
     },
 
     initMemory(targetData) {
@@ -577,11 +556,7 @@ export const game = {
                         window.uiManager.lockModule(); 
                         window.timerManager.stop(); 
                         window.toast("Memory Cleared!", true); 
-                        
-                        setTimeout(() => {
-                            let currentMod = appStore.get('currentModule');
-                            if (currentMod < 11) window.game.startModule(currentMod + 1, 0);
-                        }, 2000);
+                        // 🔥 MULTIPLAYER SYNC FIX: Removed local auto-advance.
                     }
                     else { window.toast("Host test: Memory Cleared!", true); }
                 }
@@ -601,7 +576,7 @@ export const game = {
         }
     },
 
-    handleAudioAns(isCorrect, btn) { if(isCorrect) { btn.classList.add('bg-green-200'); this.submitScore(3, "Listening", "Correct!"); } else { btn.classList.add('bg-red-200'); this.submitScore(-1, "Listening", "Missed!"); } },
+    handleAudioAns(isCorrect, btn) { if(isCorrect) { btn.classList.add('bg-emerald-500', 'text-white', 'border-emerald-600'); this.submitScore(3, "Listening", "Correct!"); } else { btn.classList.add('bg-rose-500', 'text-white', 'border-rose-600'); this.submitScore(-1, "Listening", "Missed!"); } },
     submitSpelling() { const val = document.getElementById('spelling-input').value.trim().toLowerCase(); const target = document.getElementById('spelling-input').dataset.target.trim().toLowerCase(); if(val === target) this.submitScore(3, "Writing", "Perfect!"); else this.submitScore(-1, "Writing", "Typo!"); },
     
     initHangman(data) { 
@@ -618,11 +593,11 @@ export const game = {
         document.getElementById(`hm-btn-${letter}`).disabled = true;
         
         if (d.hmPhrase.includes(letter)) {
-            document.getElementById(`hm-btn-${letter}`).classList.replace('bg-white', 'bg-green-200'); window.uiManager.updateHangmanWord();
+            document.getElementById(`hm-btn-${letter}`).classList.replace('bg-white/80', 'bg-emerald-500'); document.getElementById(`hm-btn-${letter}`).classList.add('text-white'); window.uiManager.updateHangmanWord();
             const isWin = d.hmPhrase.split('').every(char => char === ' ' || d.hmGuessed.includes(char));
             if (isWin) this.submitScore(3, "General", "Phrase Solved!");
         } else {
-            document.getElementById(`hm-btn-${letter}`).classList.replace('bg-white', 'bg-red-200'); d.hmStrikes++; window.uiManager.updateHangmanArt();
+            document.getElementById(`hm-btn-${letter}`).classList.replace('bg-white/80', 'bg-rose-500'); document.getElementById(`hm-btn-${letter}`).classList.add('text-white'); d.hmStrikes++; window.uiManager.updateHangmanArt();
             if (d.hmStrikes >= 6) this.submitScore(-1, "General", `Hanged! Phrase: ${d.hmPhrase}`);
         }
         appStore.set('localGameData', d);
@@ -648,13 +623,13 @@ export const game = {
         this.finalTranscript = "";
         this.isRecordingReadAloud = true;
         
-        btn.classList.replace('bg-red-500', 'bg-slate-800');
-        btn.classList.replace('hover:bg-red-600', 'hover:bg-slate-900');
+        btn.classList.replace('bg-rose-500', 'bg-slate-800');
+        btn.classList.replace('hover:bg-rose-600', 'hover:bg-slate-900');
         btn.classList.replace('rounded-full', 'rounded-xl');
         icon.innerText = "&#9209;"; 
         text.innerText = "Stop Recording";
         if(status) {
-            status.innerHTML = '<span class="text-green-500 animate-pulse">&#128994; Listening...</span>';
+            status.innerHTML = '<span class="text-emerald-500 animate-pulse">&#128994; Listening...</span>';
             status.dataset.state = 'listening';
         }
 
@@ -673,7 +648,7 @@ export const game = {
             wordSpans.forEach(span => {
                 let cleanWord = cleanString(span.innerText);
                 if (spokenWords.includes(cleanWord)) {
-                    span.classList.add('text-green-600', 'font-bold');
+                    span.classList.add('text-emerald-500', 'font-bold', 'drop-shadow-sm');
                 }
             });
         };
@@ -698,10 +673,10 @@ export const game = {
                 let isLow = avg < 10;
                 if (status) {
                     if (isLow && status.dataset.state !== 'low') {
-                        status.innerHTML = '<span class="text-orange-500">&#9888;&#65039; Your voice is too low! Please speak up.</span>';
+                        status.innerHTML = '<span class="text-amber-500">&#9888;&#65039; Your voice is too low! Please speak up.</span>';
                         status.dataset.state = 'low';
                     } else if (!isLow && status.dataset.state !== 'listening') {
-                        status.innerHTML = '<span class="text-green-500 animate-pulse">&#128994; Listening...</span>';
+                        status.innerHTML = '<span class="text-emerald-500 animate-pulse">&#128994; Listening...</span>';
                         status.dataset.state = 'listening';
                     }
                 }
@@ -713,7 +688,7 @@ export const game = {
             console.error(err); 
             this.stopReadAloud(true);
             if(status) {
-                status.innerHTML = '<span class="text-red-600 font-bold">&#10060; Microphone blocked. Please allow browser permissions!</span>';
+                status.innerHTML = '<span class="text-rose-500 font-bold">&#10060; Microphone blocked. Please allow browser permissions!</span>';
                 status.dataset.state = 'error';
             }
             window.toast("Microphone access denied. Please allow access.", false);
@@ -734,8 +709,8 @@ export const game = {
         if (this.micStream) this.micStream.getTracks().forEach(t => t.stop());
         if (this.audioContext && this.audioContext.state !== 'closed') this.audioContext.close();
 
-        btn.classList.replace('bg-slate-800', 'bg-red-500');
-        btn.classList.replace('hover:bg-slate-900', 'hover:bg-red-600');
+        btn.classList.replace('bg-slate-800', 'bg-rose-500');
+        btn.classList.replace('hover:bg-slate-900', 'hover:bg-rose-600');
         btn.classList.replace('rounded-xl', 'rounded-full');
         icon.innerText = "\uD83C\uDF94"; 
         text.innerText = "Start Recording";
@@ -744,14 +719,14 @@ export const game = {
 
         btn.style.pointerEvents = 'none'; 
         if(status) {
-            status.innerHTML = '<span class="text-blue-500 animate-pulse">&#9203; Processing audio...</span>';
+            status.innerHTML = '<span class="text-indigo-500 animate-pulse">&#9203; Processing audio...</span>';
             status.dataset.state = 'processing';
         }
 
         setTimeout(() => {
             this.evalReadAloud();
             if(status) {
-                status.innerHTML = '<span class="text-slate-400">&#127904; Ready to record</span>';
+                status.innerHTML = '<span class="text-slate-500 dark:text-slate-400">&#127904; Ready to record</span>';
                 status.dataset.state = 'ready';
             }
         }, 1000);
@@ -765,10 +740,10 @@ export const game = {
         const total = wordSpans.length;
 
         wordSpans.forEach(span => {
-            if (span.classList.contains('text-green-600')) {
+            if (span.classList.contains('text-emerald-500')) {
                 matches++;
             } else {
-                span.classList.add('text-red-600', 'line-through', 'font-bold');
+                span.classList.add('text-rose-500', 'line-through', 'font-bold');
             }
         });
 
@@ -793,26 +768,26 @@ export const game = {
         targetWords.forEach((tWord, i) => {
             let vWord = valWords[i] || "";
             if (vWord === tWord) {
-                htmlOut += `<span class="text-green-600 font-bold mx-1">${vWord}</span>`;
+                htmlOut += `<span class="text-emerald-500 font-bold mx-1">${vWord}</span>`;
             } else if (cleanString(vWord) === cleanString(tWord) && cleanString(vWord) !== "") {
-                htmlOut += `<span class="text-yellow-500 font-bold mx-1 underline" title="Target: ${tWord}">${vWord}</span>`;
+                htmlOut += `<span class="text-amber-500 font-bold mx-1 underline" title="Target: ${tWord}">${vWord}</span>`;
             } else {
-                htmlOut += `<span class="text-red-600 font-bold mx-1 line-through" title="Target: ${tWord}">${vWord || '?'}</span>`;
+                htmlOut += `<span class="text-rose-500 font-bold mx-1 line-through" title="Target: ${tWord}">${vWord || '?'}</span>`;
             }
         });
         
         if (valWords.length > targetWords.length) {
             for(let i = targetWords.length; i < valWords.length; i++) {
-                htmlOut += `<span class="text-red-600 font-bold mx-1 line-through" title="Extra word">${valWords[i]}</span>`;
+                htmlOut += `<span class="text-rose-500 font-bold mx-1 line-through" title="Extra word">${valWords[i]}</span>`;
             }
         }
 
         const feedbackEl = document.getElementById('dict-feedback');
         feedbackEl.innerHTML = `
-            <div class="bg-slate-100 p-4 rounded-lg mt-4 text-left border border-slate-300">
-                <p class="text-sm text-slate-500 mb-2 uppercase tracking-widest font-bold">Feedback Analysis:</p>
+            <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 rounded-xl mt-4 text-left border border-slate-200 dark:border-white/10 shadow-inner">
+                <p class="text-xs text-slate-500 mb-2 uppercase tracking-widest font-bold">Feedback Analysis:</p>
                 <div class="text-xl leading-relaxed">${htmlOut}</div>
-                <p class="text-sm text-slate-600 mt-3 font-medium">Target: <b>${target}</b></p>
+                <p class="text-sm text-slate-600 dark:text-slate-300 mt-3 font-medium">Target: <b class="text-slate-800 dark:text-white">${target}</b></p>
             </div>`;
         feedbackEl.classList.remove('opacity-0');
 
@@ -820,5 +795,5 @@ export const game = {
         else this.submitScore(-1, "Writing", "Errors detected in dictation."); 
     },
 
-    handleQuizAns(isCorrect, btn) { if(isCorrect) { btn.classList.add('bg-green-200'); this.submitScore(3, "General", "Correct!"); } else { btn.classList.add('bg-red-200'); this.submitScore(-1, "General", "Missed!"); } }
+    handleQuizAns(isCorrect, btn) { if(isCorrect) { btn.classList.add('bg-emerald-500', 'text-white', 'border-emerald-600'); this.submitScore(3, "General", "Correct!"); } else { btn.classList.add('bg-rose-500', 'text-white', 'border-rose-600'); this.submitScore(-1, "General", "Missed!"); } }
 };

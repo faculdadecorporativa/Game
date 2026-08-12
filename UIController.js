@@ -135,25 +135,17 @@ export const uiManager = {
     },
 
     renderStudy() {
-        const c = document.getElementById('flashcards-container'); 
-        if(!c) return; 
-        c.innerHTML = '';
-        
+        const c = document.getElementById('flashcards-container'); if(!c) return; c.innerHTML = '';
         window.lessonData.vocabulary.forEach(item => { 
             c.innerHTML += `
             <div class="perspective-1000 h-48 w-full group">
                 <div class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-md hover:shadow-xl rounded-2xl cursor-pointer transition-all duration-500" onclick="this.parentElement.classList.toggle('flipped')">
-                    
-                    <!-- Front Face (Light Glass) -->
                     <div class="backface-hidden absolute w-full h-full bg-white dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col justify-center items-center p-6">
                         <h3 class="text-2xl font-black text-indigo-700 dark:text-indigo-400 drop-shadow-sm">${item.term}</h3>
                         <button onclick="event.stopPropagation(); window.speakText('${item.term}');" class="mt-4 bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/40 text-indigo-600 dark:text-indigo-300 px-4 py-2 rounded-full font-bold transition-colors shadow-sm active:scale-95">Listen</button>
                     </div>
-                    
-                    <!-- Back Face (Gradient with Bulletproof White Text) -->
                     <div class="backface-hidden rotate-y-180 absolute w-full h-full bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex justify-center items-center p-6 shadow-[inset_0_0_20px_rgba(0,0,0,0.2)]">
-                        <!-- 🔥 FIX: !text-white makes it completely immune to light mode overrides 🔥 -->
-                        <p class="!text-white font-medium text-base md:text-lg leading-relaxed drop-shadow-md">${item.def}</p>
+                        <p class="text-white font-medium text-base md:text-lg leading-relaxed drop-shadow-md">${item.def}</p>
                     </div>
                 </div>
             </div>`; 
@@ -434,42 +426,18 @@ export const uiManager = {
     },
 
     renderAudio(data) {
-        const btn = document.getElementById('btn-audio-listen');
-        if(btn) btn.onclick = () => window.speakText(data.desc); 
-        
-        const c = document.getElementById('audio-options-container'); 
-        if(!c) return;
-        c.innerHTML = ''; 
-        c.dataset.answer = data.answer;
-        
+        document.getElementById('btn-audio-listen').onclick = () => window.speakText(data.desc); const c = document.getElementById('audio-options-container'); c.innerHTML = ''; c.dataset.answer = data.answer;
         data.options.forEach((opt, idx) => { 
-            const btnOpt = document.createElement('button'); 
-            btnOpt.className = "w-full text-left p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300"; 
-            btnOpt.innerText = opt; 
-            btnOpt.onclick = () => window.game.handleAudioAns(idx === data.answer, btnOpt); 
-            c.appendChild(btnOpt); 
+            const btn = document.createElement('button'); 
+            btn.className = "w-full text-left p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300"; 
+            btn.innerText = opt; 
+            btn.onclick = () => window.game.handleAudioAns(idx === data.answer, btn); 
+            c.appendChild(btn); 
         });
     },
     
-    renderSpelling(data) { 
-        const btn = document.getElementById('btn-spelling-listen');
-        if(btn) btn.onclick = () => window.speakText(data.word); 
-        
-        const inp = document.getElementById('spelling-input'); 
-        if(inp) {
-            inp.value = ''; 
-            inp.dataset.target = data.word; 
-        }
-    },
-    
     renderHangman(phrase) {
-        this.updateHangmanArt(); 
-        this.updateHangmanWord(); 
-        
-        const kbd = document.getElementById('hangman-keyboard'); 
-        if(!kbd) return;
-        kbd.innerHTML = '';
-        
+        this.updateHangmanArt(); this.updateHangmanWord(); const kbd = document.getElementById('hangman-keyboard'); kbd.innerHTML = '';
         'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(char => { 
             const btn = document.createElement('button'); 
             btn.id = `hm-btn-${char}`; 
@@ -479,31 +447,10 @@ export const uiManager = {
             kbd.appendChild(btn); 
         });
     },
-    
-    updateHangmanArt() { 
-        const artEl = document.getElementById('hangman-art');
-        const data = appStore.get('localGameData');
-        if(artEl && data) {
-            artEl.innerText = hangmanArtFrames[data.hmStrikes] || hangmanArtFrames[0]; 
-        }
-    },
-    
+    updateHangmanArt() { document.getElementById('hangman-art').innerText = hangmanArtFrames[appStore.get('localGameData').hmStrikes]; },
     updateHangmanWord() {
-        const c = document.getElementById('hangman-word'); 
-        const data = appStore.get('localGameData');
-        if(!c || !data) return;
-        c.innerHTML = '';
-        
-        data.hmPhrase.split('').forEach(char => { 
-            const span = document.createElement('span'); 
-            if (char === ' ') {
-                span.innerHTML = '&nbsp;&nbsp;'; 
-            } else { 
-                span.className = "border-b-4 border-indigo-700 dark:border-indigo-400 mx-1 w-6 inline-block text-center shadow-sm"; 
-                span.innerText = data.hmGuessed.includes(char) ? char : '_'; 
-            } 
-            c.appendChild(span); 
-        });
+        const c = document.getElementById('hangman-word'); c.innerHTML = '';
+        appStore.get('localGameData').hmPhrase.split('').forEach(char => { const span = document.createElement('span'); if (char === ' ') span.innerHTML = '&nbsp;&nbsp;'; else { span.className = "border-b-4 border-indigo-700 dark:border-indigo-400 mx-1 w-6 inline-block text-center shadow-sm"; span.innerText = appStore.get('localGameData').hmGuessed.includes(char) ? char : '_'; } c.appendChild(span); });
     },
     
     renderReadAloud(data) { 
@@ -515,17 +462,9 @@ export const uiManager = {
         if(targetEl) targetEl.innerHTML = wrappedText; 
         
         const btn = document.getElementById('btn-record-read'); 
-        if(btn) {
-            btn.style.pointerEvents = 'auto';
-            btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-black py-4 px-10 rounded-full shadow-[0_0_20px_rgba(244,63,94,0.4)] text-xl mx-auto flex items-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95"; 
-        }
-        
-        const iconEl = document.getElementById('record-icon');
-        if(iconEl) iconEl.innerText = "🎙️"; 
-        
-        const textEl = document.getElementById('record-text');
-        if(textEl) textEl.innerText = "Start Recording";
-        
+        btn.style.pointerEvents = 'auto';
+        btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-black py-4 px-10 rounded-full shadow-[0_0_20px_rgba(244,63,94,0.4)] text-xl mx-auto flex items-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95"; 
+        document.getElementById('record-icon').innerText = "Record"; document.getElementById('record-text').innerText = "Start Recording";
         const status = document.getElementById('read-status-feedback');
         if (status) { 
             status.innerHTML = '<span class="text-slate-400">Ready to record</span>'; 
@@ -547,14 +486,7 @@ export const uiManager = {
     },
     
     renderQuiz(data) {
-        const qText = document.getElementById('quiz-question-text');
-        if(qText) qText.innerText = data.q; 
-        
-        const c = document.getElementById('quiz-options-container'); 
-        if(!c) return;
-        c.innerHTML = ''; 
-        c.dataset.answer = data.answer;
-        
+        document.getElementById('quiz-question-text').innerText = data.q; const c = document.getElementById('quiz-options-container'); c.innerHTML = ''; c.dataset.answer = data.answer;
         data.options.forEach((opt, index) => { 
             const btn = document.createElement('button'); 
             btn.className = "w-full text-left p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300"; 
@@ -590,10 +522,7 @@ export const uiManager = {
                 tw.className = `mb-10 rounded-2xl p-8 text-white border border-white/20 shadow-[0_0_40px_rgba(255,255,255,0.2)] ${bgClass} backdrop-blur-xl relative overflow-hidden transform hover:scale-105 transition-all`;
                 tw_text.innerHTML = `TEAM WINS! (${maxScore} pts)`; 
             }
-            else { 
-                tw.className = `mb-10 rounded-2xl p-8 text-white border border-white/20 shadow-[0_0_40px_rgba(255,255,255,0.2)] bg-slate-800 backdrop-blur-xl relative overflow-hidden transform hover:scale-105 transition-all`; 
-                tw_text.innerHTML = `IT'S A TIE! (${maxScore} pts)`; 
-            }
+            else { tw.className = `mb-10 rounded-2xl p-8 text-white border border-white/20 shadow-[0_0_40px_rgba(255,255,255,0.2)] bg-slate-800 backdrop-blur-xl relative overflow-hidden transform hover:scale-105 transition-all`; tw_text.innerHTML = `IT'S A TIE! (${maxScore} pts)`; }
         }
 
         const sorted = Object.values(playersObj).sort((a,b) => (b.scores?.total || 0) - (a.scores?.total || 0)); 
@@ -623,25 +552,9 @@ export const uiManager = {
         });
         
         if(appStore.get('role') === 'student') {
-            document.getElementById('student-personal-stats').classList.remove('hidden'); 
-            const bars = document.getElementById('student-skill-bars'); 
-            if(bars) {
-                bars.innerHTML = '';
-                const me = appStore.get('me');
-                ['Speaking', 'Writing', 'Listening', 'General'].forEach(sk => { 
-                    const pts = me.scores[sk] || 0; 
-                    bars.innerHTML += `
-                    <div>
-                        <div class="flex justify-between text-sm font-bold text-slate-600 dark:text-slate-300 mb-1 tracking-wider uppercase">
-                            <span>${sk}</span>
-                            <span class="text-indigo-600 dark:text-indigo-400">${pts} pts</span>
-                        </div>
-                        <div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-4 shadow-inner">
-                            <div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-4 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000" style="width: ${Math.min(100, Math.max(0, pts*10))}%"></div>
-                        </div>
-                    </div>`; 
-                });
-            }
+            document.getElementById('student-personal-stats').classList.remove('hidden'); const bars = document.getElementById('student-skill-bars'); bars.innerHTML = '';
+            const me = appStore.get('me');
+            ['Speaking', 'Writing', 'Listening', 'General'].forEach(sk => { const pts = me.scores[sk] || 0; bars.innerHTML += `<div><div class="flex justify-between text-sm font-bold text-slate-600 dark:text-slate-300 mb-1 tracking-wider uppercase"><span>${sk}</span><span class="text-indigo-600 dark:text-indigo-400">${pts} pts</span></div><div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-4 shadow-inner"><div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-4 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000" style="width: ${Math.min(100, Math.max(0, pts*10))}%"></div></div></div>`; });
         }
         
         const cv = document.getElementById('confetti-canvas'); 

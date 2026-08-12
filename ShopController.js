@@ -92,11 +92,11 @@ export const shopController = {
                     <button onclick="window.shopController.buyItem('${this.currentTab}', '${item.id}')" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-105 shadow-md">
                         <span>Buy for ${item.cost}</span> <span class="text-lg">&#129689;</span>
                     </button>
-                    <p class="text-[10px] text-indigo-400 dark:text-indigo-300 mt-3 font-black uppercase tracking-widest bg-slate-200 dark:bg-slate-900 py-1.5 rounded-lg border border-slate-300 dark:border-white/10">In Locker: ${count}</p>
+                    <p class="text-[10px] text-indigo-500 dark:text-indigo-300 mt-3 font-black uppercase tracking-widest bg-slate-200 dark:bg-slate-900 py-1.5 rounded-lg border border-slate-300 dark:border-white/10 shadow-inner">In Locker: ${count}</p>
                 `;
             } else {
                 if (isEquipped) {
-                    actionButton = `<button disabled class="w-full bg-emerald-500/10 border-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-black tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-not-allowed">&#9989; EQUIPPED</button>`;
+                    actionButton = `<button disabled class="w-full bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-black tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.2)]">&#10004; EQUIPPED</button>`;
                 } else if (hasPurchased) {
                     actionButton = `<button onclick="window.shopController.equipItem('${this.currentTab}', '${item.id}')" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:-translate-y-1 shadow-[0_0_15px_rgba(79,70,229,0.3)]">&#10024; EQUIP NOW</button>`;
                 } else {
@@ -109,7 +109,7 @@ export const shopController = {
             }
 
             html += `
-                <div class="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-indigo-500/20 p-6 rounded-2xl text-center flex flex-col justify-between transition-all hover:border-indigo-400 dark:hover:border-indigo-400 ${item.glow}">
+                <div class="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-indigo-500/20 p-6 rounded-2xl text-center flex flex-col justify-between transition-all hover:border-indigo-400 dark:hover:border-indigo-400 hover:-translate-y-1 shadow-sm ${item.glow}">
                     <div>
                         <div class="w-20 h-20 mx-auto bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-4xl mb-4 border border-slate-300 dark:border-white/5 shadow-inner">
                             ${item.icon}
@@ -136,6 +136,13 @@ export const shopController = {
         if (me.coins < item.cost) {
             if (window.toast) window.toast(`Not enough coins! You need ${item.cost - me.coins} more.`, false);
             if (window.sfx) window.sfx.play('wrong'); 
+            
+            // 🔥 UX Feedback: Shake the coin counter to show they are broke!
+            const coinEl = document.getElementById('shop-coins');
+            if (coinEl) {
+                coinEl.classList.add('text-rose-500', 'animate-pulse');
+                setTimeout(() => coinEl.classList.remove('text-rose-500', 'animate-pulse'), 1000);
+            }
             return;
         }
 
@@ -186,6 +193,7 @@ export const shopController = {
                 me.avatar = item.equipValue;
             } else {
                 me.equipped[item.equipType] = item.equipValue;
+                // Keep border synced at root level for Scoreboard backwards compatibility
                 if(item.equipType === 'border') {
                     me.border = item.equipValue;
                 }

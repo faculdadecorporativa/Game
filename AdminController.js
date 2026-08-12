@@ -25,7 +25,7 @@ export const adminUI = {
         
         // 🔥 FIX: The drawing board will now successfully initialize!
         this.setupDrawingBoard('mod3-draw-container'); 
-        
+        // 🔥 FIX: Purged legacy mod8-draw-container initialization that caused background errors!
         this.renderTeams(); 
         this.renderStudentManagement(); 
         this.updateLobbyList();
@@ -124,6 +124,7 @@ export const adminUI = {
         }
     },
 
+    // Standard small image compressor (Avatars, Memory Match Cards)
     compressImageToSquare(file, callback) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -168,6 +169,33 @@ export const adminUI = {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
                 callback(canvas.toDataURL('image/jpeg', 0.8)); 
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    },
+
+    // Aggressive Background Compressor to stop localStorage crashes
+    compressBackgroundImage(file, callback) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 600; 
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > MAX_WIDTH) {
+                    height = Math.round(height * (MAX_WIDTH / width));
+                    width = MAX_WIDTH;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                callback(canvas.toDataURL('image/jpeg', 0.4)); 
             };
             img.src = e.target.result;
         };

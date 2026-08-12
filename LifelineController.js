@@ -1,34 +1,48 @@
 // 🏗️ LifelineController.js
 // This file manages the game's lifeline logic (50/50, Ask Prof, Google, Call a Friend, Freeze Time, Time Burn)
 
+import { appStore } from './store.js';
+
 export const lifelineManager = {
     modalTimerInterval: null,
     
     renderButtons(mod) {
-        const p = window.appState.me;
-        document.getElementById('ll-fiftyFifty').disabled = !p.lifelines.fiftyFifty || [1,3,4,8,9,10].includes(mod);
-        document.getElementById('ll-askProf').disabled = !p.lifelines.askProf;
-        document.getElementById('ll-google').disabled = !p.lifelines.google;
-        document.getElementById('ll-callFriend').disabled = !p.lifelines.callFriend;
+        const p = appStore.get('me');
+        if (!p || !p.lifelines) return;
+
+        // 🔥 FIX: Disabled 50/50 for Module 2 (PvP Puzzle) to prevent drag-and-drop legacy crash
+        const fiftyFiftyBtn = document.getElementById('ll-fiftyFifty');
+        if (fiftyFiftyBtn) fiftyFiftyBtn.disabled = !p.lifelines.fiftyFifty || [1, 2, 3, 4, 8, 9, 10].includes(mod);
+        
+        const askProfBtn = document.getElementById('ll-askProf');
+        if (askProfBtn) askProfBtn.disabled = !p.lifelines.askProf;
+        
+        const googleBtn = document.getElementById('ll-google');
+        if (googleBtn) googleBtn.disabled = !p.lifelines.google;
+        
+        const callFriendBtn = document.getElementById('ll-callFriend');
+        if (callFriendBtn) callFriendBtn.disabled = !p.lifelines.callFriend;
     },
     
     use(type) {
-        // Use window.appStore to ensure safe data fetching
-        const p = window.appStore.get('me'); 
+        // 🔥 FIX: Use window.appStore to ensure safe data fetching and reactivity
+        const p = appStore.get('me'); 
+        if (!p) return;
         
-        // 🔥 NEW: Check if it's a store inventory item (Consumables) 🔥
+        // --- Store Inventory Items (Consumables) ---
         if (['freezeTime', 'timeBurn'].includes(type)) {
             if (!p.inventory || !p.inventory[type] || p.inventory[type] <= 0) {
-                window.toast("You don't own this item! Visit the store.", false);
+                if(window.toast) window.toast("You don't own this item! Visit the store.", false);
+                if(window.sfx) window.sfx.play('wrong');
                 return;
             }
             
             // Consume item locally
             p.inventory[type] -= 1;
-            window.appStore.set('me', p);
+            appStore.set('me', p);
 
             // Consume in Firebase
-            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
+            if (window.firebaseRef && window.firebaseSet && window.firebaseDB && p.uid) {
                 const userRef = window.firebaseRef(window.firebaseDB, `users/${p.uid}/inventory/${type}`);
                 window.firebaseSet(userRef, p.inventory[type]);
             }
@@ -38,30 +52,36 @@ export const lifelineManager = {
 
             // Execute Active Effects
             if (type === 'freezeTime') {
-                window.timerManager.pause();
-                window.toast("❄️ Time Frozen for 15 seconds!", true);
-                window.sfx.play('correct');
+                if(window.timerManager) window.timerManager.pause();
+                if(window.toast) window.toast("❄️ Time Frozen for 15 seconds!", true);
+                if(window.sfx) window.sfx.play('correct');
                 
                 setTimeout(() => {
-                    window.timerManager.resume();
-                    window.toast("⏱️ Time is moving again!", false);
+                    if(window.timerManager) window.timerManager.resume();
+                    if(window.toast) window.toast("⏱️ Time is moving again!", false);
                 }, 15000);
             }
             
             if (type === 'timeBurn') {
-                const hostConn = window.appStore.get('hostConn');
-                if(hostConn) hostConn.send({ type: 'TIME_BURN', id: p.uid });
-                window.toast("🔥 Burned opponents' time!", true);
-                window.sfx.play('correct');
+                const hostConn = appStore.get('hostConn');
+                if(hostConn && hostConn.send) {
+                    hostConn.send({ type: 'TIME_BURN', id: p.uid });
+                }
+                if(window.toast) window.toast("🔥 Burned opponents' time!", true);
+                if(window.sfx) window.sfx.play('correct');
             }
             
-            return; // Exit early since it was an inventory item
+            return; 
         }
 
         // --- Original Classic Lifeline Logic ---
         if(!p.lifelines[type]) return; 
+        
+        // Mark as used
         p.lifelines[type] = false; 
-        this.renderButtons(window.appStore.get('currentModule'));
+        appStore.set('me', p);
+        
+        this.renderButtons(appStore.get('currentModule'));
         
         if(type === 'fiftyFifty') this.execute5050();
         if(type === 'askProf') this.showModal("Ask the Professor", "Ask your Professor for a hint!");
@@ -70,25 +90,36 @@ export const lifelineManager = {
     },
     
     execute5050() {
-        const mod = window.appState.currentModule;
-        if (mod === 2) {
-            const allDrags = Array.from(document.querySelectorAll('.draggable')); 
-            const targetId = document.getElementById('dropzone').dataset.target;
-            const wrongDrags = window.shuffleArray(allDrags.filter(d => d.dataset.id !== targetId)); 
-            for(let i=0; i<Math.ceil(wrongDrags.length/2); i++) wrongDrags[i].style.display = 'none';
-        } else if (mod === 5 || mod === 11) {
+        const mod = appStore.get('currentModule');
+        
+        if (mod === 5 || mod === 11) {
+            // Audio (5) or Quiz (11)
             const cId = mod === 5 ? 'audio-options-container' : 'quiz-options-container'; 
-            const options = Array.from(document.getElementById(cId).children);
-            const ans = document.getElementById(cId).dataset.answer; 
+            const container = document.getElementById(cId);
+            if (!container) return;
+            
+            const options = Array.from(container.children);
+            const ans = container.dataset.answer; 
+            
+            if (ans === undefined) return;
+            
             const wrongOptions = window.shuffleArray(options.filter((_, idx) => idx != ans));
             for(let i=0; i<Math.ceil(wrongOptions.length/2); i++) { 
                 wrongOptions[i].disabled = true; 
-                wrongOptions[i].classList.add('opacity-30'); 
+                // 🔥 UI Polish: Make dead buttons look completely disabled
+                wrongOptions[i].classList.add('opacity-30', 'cursor-not-allowed', 'scale-95', 'grayscale'); 
+                wrongOptions[i].classList.remove('hover:-translate-y-1', 'hover:border-indigo-500');
             }
+            
         } else if (mod === 6) {
-            const word = document.getElementById('spelling-input').dataset.target; 
+            // Spelling Bee (6)
+            const input = document.getElementById('spelling-input');
+            if (!input || !input.dataset.target) return;
+            
+            const word = input.dataset.target; 
             let nonSpace = [];
             for(let i=0; i<word.length; i++) { if(word[i] !== ' ') nonSpace.push(i); }
+            
             let reveal = window.shuffleArray([...nonSpace]).slice(0, Math.floor(nonSpace.length / 2)); 
             let result = "";
             for(let i=0; i<word.length; i++) { 
@@ -96,21 +127,32 @@ export const lifelineManager = {
                 else if(reveal.includes(i)) result += word[i]; 
                 else result += '_'; 
             }
-            document.getElementById('spelling-input').value = result;
+            input.value = result;
+            
         } else if (mod === 7) {
-            const phrase = window.appState.localGameData.hmPhrase; 
+            // Hangman (7)
+            const d = appStore.get('localGameData');
+            if (!d || !d.hmPhrase) return;
+            
+            const phrase = d.hmPhrase; 
             const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-            const wrongLetters = alphabet.filter(l => !phrase.includes(l) && !window.appState.localGameData.hmGuessed.includes(l));
+            const wrongLetters = alphabet.filter(l => !phrase.includes(l) && !d.hmGuessed.includes(l));
             const disable = window.shuffleArray(wrongLetters).slice(0, Math.floor(wrongLetters.length / 2));
+            
             disable.forEach(l => { 
                 const btn = document.getElementById(`hm-btn-${l}`); 
-                if(btn) { btn.disabled = true; btn.classList.add('opacity-30'); } 
+                if(btn) { 
+                    btn.disabled = true; 
+                    btn.classList.add('opacity-30', 'cursor-not-allowed', 'grayscale'); 
+                    btn.classList.remove('hover:bg-indigo-500', 'hover:-translate-y-1');
+                } 
             });
         }
     },
     
     showModal(title, desc, duration = 0) {
-        window.timerManager.pause(); 
+        if(window.timerManager) window.timerManager.pause(); 
+        
         document.getElementById('modal-title').innerText = title; 
         document.getElementById('modal-desc').innerText = desc;
         const timerEl = document.getElementById('modal-timer');
@@ -131,13 +173,14 @@ export const lifelineManager = {
             timerEl.classList.add('hidden'); 
         }
         
-        // Target the actual lifeline modal ID
-        document.getElementById('modal-lifeline').classList.remove('hidden');
+        const modal = document.getElementById('modal-lifeline');
+        if (modal) modal.classList.remove('hidden');
     },
     
     closeModal() { 
         clearInterval(this.modalTimerInterval); 
-        document.getElementById('modal-lifeline').classList.add('hidden'); 
-        window.timerManager.resume(); 
+        const modal = document.getElementById('modal-lifeline');
+        if (modal) modal.classList.add('hidden'); 
+        if(window.timerManager) window.timerManager.resume(); 
     }
 };

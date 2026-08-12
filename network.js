@@ -63,8 +63,7 @@ export const app = {
             
             const pin = appStore.get('roomCode');
             
-            // 🔥 CRITICAL FIREBASE CRASH FIX 🔥
-            // JSON stringify/parse instantly strips out all 'undefined' array holes that crash Firebase!
+            // 🔥 CRITICAL FIREBASE CRASH FIX: Strip out all 'undefined' array holes!
             const cleanLessonData = JSON.parse(JSON.stringify(window.lessonData || {}));
 
             // 2. Broadcast the pristine lesson data to the live room
@@ -109,7 +108,7 @@ export const app = {
         }
     },
 
-    // 🔥 NEW BULLETPROOF ROUTING ENGINE 🔥
+    // 🔥 DYNAMIC BULLETPROOF ROUTING ENGINE 🔥
     hostNextModule() {
         const state = appStore.state;
         let activeMods = state.activeModules || window.lessonData.activeModules || [1,2,3,4,5,6,7,8,9,10,11];
@@ -265,7 +264,8 @@ export const app = {
             }
         });
 
-        window.firebaseOnValue(gameStateRef, (snapshot) => {
+        // 🔥 CRITICAL FIX: Asynchronous listener guarantees missing data is downloaded before rendering!
+        window.firebaseOnValue(gameStateRef, async (snapshot) => {
             const data = snapshot.val();
             if (!data) return;
 
@@ -275,6 +275,12 @@ export const app = {
                     const waitSpinner = document.getElementById('wait-spinner');
                     if(waitSpinner) waitSpinner.classList.add('hidden');
                     
+                    // 🔥 STRICT SYNC: Force download if lessonData hasn't arrived yet!
+                    if (!window.lessonData || Object.keys(window.lessonData).length === 0) {
+                        const snap = await window.firebaseGet(dataRef);
+                        if (snap.exists()) window.lessonData = snap.val();
+                    }
+
                     if(window.uiManager && window.uiManager.unlockModule) window.uiManager.unlockModule();
                     if(window.game && window.game.startModule) window.game.startModule(data.currentModule, data.currentIndex);
                     appStore.set('currentModule', data.currentModule);

@@ -110,7 +110,6 @@ export const authManager = {
         const cleanPhoneInput = String(phoneInput).replace(/\D/g, '');
         if(!cleanPhoneInput || !password) throw new Error("Phone and password are required.");
         
-        // 🔥 FIX: Blocks empty or undefined Professor IDs
         if(!profId || profId === "undefined" || profId === "") throw new Error("Please select your Professor.");
 
         appStore.set('currentProfId', profId);
@@ -128,7 +127,7 @@ export const authManager = {
             // Try standard login first
             userCredential = await window.firebaseSignIn(window.firebaseAuth, shadowEmail, password);
         } catch (error) {
-            // 🔥 AUTO-FIX MAGIC: If manually added by a professor, create their login right now silently
+            // AUTO-FIX MAGIC: If manually added by a professor, create their login right now silently
             try {
                 userCredential = await window.firebaseCreateUser(window.firebaseAuth, shadowEmail, password);
                 studentProfile.uid = userCredential.user.uid;
@@ -141,15 +140,23 @@ export const authManager = {
         }
         
         const teams = appStore.get('teams') || [{id: 'eagle'}];
+        
+        // 🔥 CRITICAL FIX: Ensure the ENTIRE Phase 3 RPG Payload is loaded seamlessly 🔥
         const newMe = { 
             uid: studentProfile.uid || userCredential.user.uid,
-            phone, name: studentProfile.name, avatar: studentProfile.avatar, 
-            team: studentProfile.team || teams[0].id, border: 'border-slate-300', 
+            phone: phone, 
+            name: studentProfile.name, 
+            avatar: studentProfile.avatar, 
+            team: studentProfile.team || teams[0].id, 
+            border: studentProfile.border || 'border-slate-300', 
             scores: studentProfile.scores || { total:0, Speaking:0, Writing:0, Listening:0, General:0 }, 
-            lifelines: studentProfile.lifelines || { fiftyFifty: true, askProf: true, google: true, callFriend: true }, 
+            lifelines: studentProfile.lifelines || { fiftyFifty: true, askProf: true, google: true, callFriend: true, freezeTime: true, timeBurn: true }, 
             streak: studentProfile.streak || 0,
+            maxStreak: studentProfile.maxStreak || 0,
             xp: studentProfile.xp || 0,
-            coins: studentProfile.coins || 0
+            coins: studentProfile.coins || 0,
+            inventory: studentProfile.inventory || {},
+            equipped: studentProfile.equipped || { title: 'Novice Learner', border: 'border-slate-300' }
         };
         
         appStore.set('me', newMe);

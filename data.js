@@ -1,28 +1,83 @@
 // data.js
+// Default Lesson Data updated to strictly conform to the Phase 6 RPG Module Schema
 
 export const defaultLessonData = {
-    vocabulary: [{ term: "Performance Homeostasis", def: "Maintaining the same level of performance established when a job was first mastered.", matchImg: null }, { term: "Halo Effect", def: "Our perceptions being altered positively or negatively based on overall impressions.", matchImg: null }],
-    hotspots: [{ prompt: "Find the Feedback Receiver (Person listening)", target: { top: 35, left: 60, width: 20, height: 45 } }],
-    audioGuess: [{ desc: "This concept describes how we naturally want to defend ourselves against criticism by rejecting the validity of the feedback.", options: ["Performance Homeostasis", "Denial", "Halo Effect", "Codependence"], answer: 1, skill: "Listening" }],
-    spellingBee: [{ word: "Codependence", skill: "Writing" }],
-    hangman: [{ phrase: "THE POWER OF FEEDBACK", skill: "General" }],
-    wally: [{ prompt: "Find the small red paper plane on the desk.", target: { top: 75, left: 40, width: 5, height: 5 } }],
-    readAloud: [{ text: "Feedback is essential for growth. Without it, we are flying blind. We must learn to accept feedback to improve our performance.", skill: "Speaking" }],
-    dictation: [{ text: "We tend to attribute other people's success or failure to the people themselves.", skill: "Writing" }],
-    quiz: [{ q: "What usually happens if you receive feedback but refuse to change for the better?", options: ["You will be perceived more negatively.", "People forget it.", "Performance naturally increases.", "You are seen as independent."], answer: 0, skill: "General" }],
+    vocabulary: [
+        { term: "Performance Homeostasis", def: "Maintaining the same level of performance established when a job was first mastered." }, 
+        { term: "Halo Effect", def: "Our perceptions being altered positively or negatively based on overall impressions." }
+    ],
+    puzzleMatch: { 
+        image: "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&q=80",
+        questions: [{ q: "What is the primary goal of feedback?", options: ["Growth", "Confusion", "Criticism", "Delay"], answer: 0 }] 
+    },
+    hotspots: [
+        { prompt: "Find the Feedback Receiver (Person listening)", target: { top: 35, left: 60, width: 20, height: 45 } }
+    ],
+    ticTacToe: [
+        { q: "Feedback should be specific rather than general. True or False?", options: ["True", "False"], answer: 0 }
+    ],
+    audioGuess: [
+        { desc: "This concept describes how we naturally want to defend ourselves against criticism by rejecting the validity of the feedback.", options: ["Performance Homeostasis", "Denial", "Halo Effect", "Codependence"], answer: 1, skill: "Listening" }
+    ],
+    spellingBee: [
+        { word: "Codependence", skill: "Writing" }
+    ],
+    hangman: [
+        { phrase: "THE POWER OF FEEDBACK", skill: "General" }
+    ],
+    memoryMatch: [
+        { term: "Homeostasis", match: "Stability" },
+        { term: "Halo Effect", match: "Bias" }
+    ],
+    readAloud: [
+        { text: "Feedback is essential for growth. Without it, we are flying blind. We must learn to accept feedback to improve our performance.", skill: "Speaking" }
+    ],
+    dictation: [
+        { text: "We tend to attribute other people's success or failure to the people themselves.", skill: "Writing" }
+    ],
+    quiz: [
+        { q: "What usually happens if you receive feedback but refuse to change for the better?", options: ["You will be perceived more negatively.", "People forget it.", "Performance naturally increases.", "You are seen as independent."], answer: 0, skill: "General" }
+    ],
     chatPhrases: ["Good job!", "Not bad!", "Keep it up!", "Impressive!", "You are unstoppable!"]
 };
 
 export const cyberSecurityMockData = {
-    vocabulary: [{ term: "Malware", def: "Software that is specifically designed to disrupt, damage, or gain unauthorized access to a computer system.", matchImg: null }, { term: "Phishing", def: "The fraudulent practice of sending emails purporting to be from reputable companies.", matchImg: null }],
-    hotspots: [{ prompt: "Find the locked padlock symbol", target: { top: 20, left: 20, width: 15, height: 15 } }],
-    audioGuess: [{ desc: "This is a security system that monitors and controls incoming and outgoing network traffic based on predetermined rules.", options: ["Malware", "Phishing", "Firewall", "Encryption"], answer: 2, skill: "Listening" }],
-    spellingBee: [{ word: "Vulnerability", skill: "Writing" }],
-    hangman: [{ phrase: "MULTIFACTOR AUTHENTICATION", skill: "General" }],
-    wally: [{ prompt: "Find the hidden hacker icon.", target: { top: 80, left: 80, width: 5, height: 5 } }],
-    readAloud: [{ text: "Cybersecurity is the practice of protecting systems, networks, and programs from digital attacks.", skill: "Speaking" }],
-    dictation: [{ text: "Always use strong and unique passwords for your accounts.", skill: "Writing" }],
-    quiz: [{ q: "Which of the following is considered a strong password?", options: ["password123", "admin", "P@ssw0rd_2026!", "123456"], answer: 2, skill: "General" }],
+    vocabulary: [
+        { term: "Malware", def: "Software designed to disrupt, damage, or gain unauthorized access to a computer system." }, 
+        { term: "Phishing", def: "Fraudulent practice of sending emails purporting to be from reputable companies." }
+    ],
+    puzzleMatch: { 
+        image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80",
+        questions: [{ q: "What protocol secures web traffic?", options: ["HTTP", "HTTPS", "FTP", "SMTP"], answer: 1 }] 
+    },
+    hotspots: [
+        { prompt: "Find the locked padlock symbol", target: { top: 20, left: 20, width: 15, height: 15 } }
+    ],
+    ticTacToe: [
+        { q: "Is sharing your password safe?", options: ["Yes", "No"], answer: 1 }
+    ],
+    audioGuess: [
+        { desc: "This is a security system that monitors and controls network traffic based on rules.", options: ["Malware", "Phishing", "Firewall", "Encryption"], answer: 2, skill: "Listening" }
+    ],
+    spellingBee: [
+        { word: "Vulnerability", skill: "Writing" }
+    ],
+    hangman: [
+        { phrase: "MULTIFACTOR AUTHENTICATION", skill: "General" }
+    ],
+    memoryMatch: [
+        { term: "Firewall", match: "Filter" },
+        { term: "Phishing", match: "Fraud" }
+    ],
+    readAloud: [
+        { text: "Cybersecurity is the practice of protecting systems, networks, and programs from digital attacks.", skill: "Speaking" }
+    ],
+    dictation: [
+        { text: "Always use strong and unique passwords for your accounts.", skill: "Writing" }
+    ],
+    quiz: [
+        { q: "Which of the following is considered a strong password?", options: ["password123", "admin", "P@ssw0rd_2026!", "123456"], answer: 2, skill: "General" }
+    ],
     chatPhrases: ["Excellent!", "Secure choice!", "Well done, admin!", "Hacker defeated!", "Top tier!"]
 };
 
