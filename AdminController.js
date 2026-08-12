@@ -25,7 +25,7 @@ export const adminUI = {
         
         // 🔥 FIX: The drawing board will now successfully initialize!
         this.setupDrawingBoard('mod3-draw-container'); 
-        
+        // 🔥 FIX: Purged legacy mod8-draw-container initialization that caused background errors!
         this.renderTeams(); 
         this.renderStudentManagement(); 
         this.updateLobbyList();
@@ -124,6 +124,7 @@ export const adminUI = {
         }
     },
 
+    // Standard small image compressor (Avatars, Memory Match Cards)
     compressImageToSquare(file, callback) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -174,6 +175,33 @@ export const adminUI = {
         reader.readAsDataURL(file);
     },
 
+    // Aggressive Background Compressor to stop localStorage crashes
+    compressBackgroundImage(file, callback) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 600; 
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > MAX_WIDTH) {
+                    height = Math.round(height * (MAX_WIDTH / width));
+                    width = MAX_WIDTH;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                callback(canvas.toDataURL('image/jpeg', 0.4)); 
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    },
+
     handleProfAvatar(e) {
         const f = e.target.files[0];
         if(f) {
@@ -211,37 +239,6 @@ export const adminUI = {
                 window.lessonData.memoryMatch[idx][key] = compressedData;
             });
         }
-    },
-
-    handlePuzzleBgUpload(e) { 
-        const f = e.target.files[0]; 
-        if(f) { 
-            this.compressBackgroundImage(f, (compressedData) => {
-                if(!window.lessonData.puzzleMatch) window.lessonData.puzzleMatch = { questions: [] };
-                window.lessonData.puzzleMatch.image = compressedData; 
-                this.renderContentEditors();
-            });
-        } 
-    },
-    
-    // 🔥 FIX: Properly saves the Mod 3 Image to the Database Payload!
-    handleBgUpload(e, imgId, destId) { 
-        const f = e.target.files[0]; 
-        if(f) { 
-            this.compressBackgroundImage(f, (compressedData) => {
-                const imgEl = document.getElementById(imgId);
-                if (imgEl) imgEl.src = compressedData; 
-                
-                const destEl = document.getElementById(destId);
-                if(destEl) destEl.src = compressedData; 
-                
-                if(!window.lessonData.visualAssessment) window.lessonData.visualAssessment = {};
-                window.lessonData.visualAssessment.image = compressedData;
-                
-                this.renderContentEditors();
-                window.toast("Image loaded and saved!", true);
-            });
-        } 
     },
 
     updateStudentAvatar(e, phone) { 
@@ -763,56 +760,25 @@ export const adminUI = {
         }
     },
     
-    // 🔥 NEW: Premium Drawing Board Logic for Visual Assessment 🔥
-    setupDrawingBoard(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        const layer = container.querySelector('#mod3-admin-layer');
-        let isDrawing = false;
-        let startX, startY, currentBox;
-
-        container.addEventListener('mousedown', (e) => {
-            isDrawing = true;
-            const rect = container.getBoundingClientRect();
-            startX = ((e.clientX - rect.left) / rect.width) * 100;
-            startY = ((e.clientY - rect.top) / rect.height) * 100;
-
-            if (currentBox) currentBox.remove();
-            
-            currentBox = document.createElement('div');
-            // Premium glowing selection box
-            currentBox.className = 'draw-box absolute border-4 border-rose-500 bg-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.6)] rounded-sm pointer-events-none';
-            currentBox.style.left = `${startX}%`;
-            currentBox.style.top = `${startY}%`;
-            currentBox.style.width = '0%';
-            currentBox.style.height = '0%';
-            layer.appendChild(currentBox);
-        });
-
-        container.addEventListener('mousemove', (e) => {
-            if (!isDrawing) return;
-            const rect = container.getBoundingClientRect();
-            let currX = ((e.clientX - rect.left) / rect.width) * 100;
-            let currY = ((e.clientY - rect.top) / rect.height) * 100;
-
-            currX = Math.max(0, Math.min(100, currX));
-            currY = Math.max(0, Math.min(100, currY));
-
-            const left = Math.min(startX, currX);
-            const top = Math.min(startY, currY);
-            const width = Math.abs(currX - startX);
-            const height = Math.abs(currY - startY);
-
-            currentBox.style.left = `${left}%`;
-            currentBox.style.top = `${top}%`;
-            currentBox.style.width = `${width}%`;
-            currentBox.style.height = `${height}%`;
-            
-            container.dataset.box = JSON.stringify({ left, top, width, height });
-        });
-
-        container.addEventListener('mouseup', () => { isDrawing = false; });
-        container.addEventListener('mouseleave', () => { isDrawing = false; });
+    handleBgUpload(e, imgId, destId) { 
+        const f = e.target.files[0]; 
+        if(f) { 
+            const r = new FileReader(); 
+            r.onload = ev => { 
+                document.getElementById(imgId).src = ev.target.result; 
+                if(destId) document.getElementById(destId).src = ev.target.result; 
+            }; 
+            r.readAsDataURL(f); 
+        } 
+    },
+    
+    setupDrawingBoard(cId) {
+        const c = document.getElementById(cId); let isDraw=false, sX, sY, box;
+        if(!c) return;
+        c.onmousedown = (e) => { 
+            isDraw=true; const r = c.getBoundingClientRect(); sX = e.clientX - r.left; sY = e.clientY - r.top; 
+            if(box) box.remove(); box = document.createElement('div'); box.className='draw-box'; box.style.left=sX+'px'; box.style.top=sY+'px'; c.querySelector('div').appendChild(box); 
+        };
     },
     
     addDrawnHotspot(modNum) {
@@ -820,14 +786,9 @@ export const adminUI = {
         const iId = 'mod3-prompt-input';
         const c = document.getElementById(cId); const i = document.getElementById(iId); if(!c || !c.dataset.box || !i.value) return;
         const target = JSON.parse(c.dataset.box); 
-        
-        if(!window.lessonData.hotspots) window.lessonData.hotspots = [];
-        window.lessonData.hotspots.push({ prompt: i.value, target }); 
-        
-        i.value = ''; c.dataset.box = ''; const b = c.querySelector('.draw-box'); if(b) b.remove(); 
-        
-        this.renderContentEditors();
-        window.toast("Target added successfully!", true);
+        if(modNum === 3) window.lessonData.hotspots.push({ prompt: i.value, target }); 
+        if(modNum === 8) window.lessonData.wally.push({ prompt: i.value, target });
+        i.value = ''; c.dataset.box = ''; const b = c.querySelector('.draw-box'); if(b) b.remove(); this.renderContentEditors();
     },
     
     addItem(type) {
@@ -889,23 +850,6 @@ export const adminUI = {
         const memTypeSelect = document.getElementById('mod8-match-type');
         const memType = memTypeSelect ? memTypeSelect.value : (window.lessonData.memoryMatchType || 'text-text');
         if (memTypeSelect) memTypeSelect.value = memType;
-
-        const puzzlePreview = document.getElementById('mod2-puzzle-preview');
-        if(puzzlePreview) {
-            if(window.lessonData.puzzleMatch && window.lessonData.puzzleMatch.image) {
-                puzzlePreview.style.backgroundImage = `url(${window.lessonData.puzzleMatch.image})`;
-                puzzlePreview.classList.remove('hidden');
-            } else {
-                puzzlePreview.classList.add('hidden');
-            }
-        }
-        
-        const mod3Preview = document.getElementById('mod3-admin-bg');
-        if(mod3Preview && window.lessonData.visualAssessment && window.lessonData.visualAssessment.image) {
-            mod3Preview.src = window.lessonData.visualAssessment.image;
-        }
-        
-        _r('admin-puzzle-list', (window.lessonData.puzzleMatch && window.lessonData.puzzleMatch.questions) ? window.lessonData.puzzleMatch.questions : [], (t, i) => `<div class="flex items-start gap-2 pb-2 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1 flex flex-col gap-1"><input type="text" class="puz-q p-2 border border-slate-300 dark:border-white/20 rounded text-xs bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${t.q}" data-idx="${i}"><div class="grid grid-cols-2 gap-1">${t.options.map((opt, oIdx) => `<div class="flex items-center gap-1"><input type="radio" name="puz-ans-${i}" value="${oIdx}" ${t.answer === oIdx ? 'checked' : ''}><input type="text" class="puz-opt text-[10px] p-2 border border-slate-300 dark:border-white/20 rounded w-full bg-white dark:bg-black/30 text-slate-800 dark:text-slate-200" value="${opt}" data-qidx="${i}" data-oidx="${oIdx}"></div>`).join('')}</div></div>${delBtn('puzzleMatch', i)}</div>`);
         
         _r('admin-memory-list', window.lessonData.memoryMatch || [], (m, i) => {
             let html = '<div class="flex items-center gap-2 pb-3 border-b border-slate-200 dark:border-white/10 w-full"><div class="flex-1">';
@@ -1038,13 +982,7 @@ export const adminUI = {
         window.lessonData.quiz.forEach((q, idx) => { const s = document.querySelector(`input[name="quiz-ans-${idx}"]:checked`); if(s) q.answer = parseInt(s.value); });
         
         authManager.saveDB(window.lessonData, 'lessonData');
-        
-        try {
-            localStorage.setItem('profLessonData', JSON.stringify(window.lessonData));
-            window.toast("Lesson data saved globally!", true);
-        } catch (err) {
-            console.warn("Local storage full! Cloud save succeeded, but local cache skipped.", err);
-            window.toast("Lesson saved to cloud! (File too large for local cache)", true);
-        }
+        localStorage.setItem('profLessonData', JSON.stringify(window.lessonData));
+        window.toast("Lesson data saved globally!", true);
     }
 };

@@ -11,12 +11,13 @@ export class ModuleTwo extends HTMLElement {
 
     render() {
         this.innerHTML = `
-            <!-- Changed blur-md to nothing, kept scale-105 -->
+            <!-- STREAMING_CHUNK:Rendering Module 2 Header -->
             <span class="text-indigo-600 dark:text-white font-bold tracking-wider uppercase text-sm transition-colors duration-300">Module 2 of 11</span>
             <h2 class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 mb-6 transition-colors duration-300">PvP Puzzle Race</h2>
             
             <div id="lifeline-mount-2"></div>
             
+            <!-- STREAMING_CHUNK:Rendering Main Puzzle Container -->
             <div class="bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl p-6 md:p-10 rounded-3xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 relative overflow-hidden transition-all duration-300 w-full max-w-5xl mx-auto">
                 
                 <!-- 🔥 PvP Player Header 🔥 -->
@@ -37,10 +38,11 @@ export class ModuleTwo extends HTMLElement {
                     Waiting for Matchmaking...
                 </div>
 
+                <!-- STREAMING_CHUNK:Rendering Dynamic Puzzle Board -->
                 <!-- 🔥 Dynamic Puzzle Grid Container 🔥 -->
                 <div class="relative w-full aspect-video max-h-[60vh] mx-auto rounded-3xl overflow-hidden border-4 border-slate-300 dark:border-white/20 shadow-2xl bg-slate-200 dark:bg-slate-800">
                     <!-- Background Image (Target Image) -->
-                    <div id="puzzle-bg-img" class="absolute inset-0 bg-cover bg-center z-0 transition-all duration-500 scale-105"></div>
+                    <div id="puzzle-bg-img" class="absolute inset-0 bg-cover bg-center z-0 transition-all duration-500 blur-md scale-105"></div>
                     
                     <!-- Frosted Glass Tiles Overlay (Injected dynamically by UIController) -->
                     <div id="puzzle-board" class="absolute inset-0 z-10 pointer-events-none opacity-50 transition-all duration-300">
@@ -48,10 +50,11 @@ export class ModuleTwo extends HTMLElement {
                     </div>
                 </div>
 
-                <!-- 🔥 Pop-Up Question Overlay 🔥 -->
-                <div id="puzzle-question-overlay" class="absolute inset-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl z-20 flex flex-col items-center justify-center p-6 md:p-12 hidden opacity-0 transition-opacity duration-300 rounded-3xl">
-                    <h3 id="puzzle-q-text" class="text-2xl md:text-4xl font-bold text-slate-900 dark:text-white mb-10 text-center leading-tight">Question goes here?</h3>
-                    <div id="puzzle-options" class="w-full max-w-2xl space-y-4 grid grid-cols-1 gap-4">
+                <!-- STREAMING_CHUNK:Rendering Question Overlay -->
+                <!-- 🔥 Pop-Up Question Overlay (With Safe Overflow) 🔥 -->
+                <div id="puzzle-question-overlay" class="absolute inset-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl z-20 flex flex-col items-center justify-center p-6 md:p-12 hidden opacity-0 transition-opacity duration-300 rounded-3xl border border-white/20 shadow-2xl">
+                    <h3 id="puzzle-q-text" class="text-2xl md:text-4xl font-bold text-slate-900 dark:text-white mb-8 text-center leading-tight">Question goes here?</h3>
+                    <div id="puzzle-options" class="w-full max-w-2xl space-y-4 grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto custom-scrollbar px-2">
                         <!-- Options injected by UIController.js -->
                     </div>
                 </div>

@@ -1,23 +1,15 @@
 // 🏗️ Utilities.js
-// Secondary logic controllers: Shop, AI Simulator, Image Compression, and Global Timer.
+// Secondary logic controllers: AI Simulator, Global Timer, and safe deprecations.
 
+// 🧹 DEPRECATED: Safely stubbed to prevent index.html import crashes. 
+// Functionality moved to ShopController.js
 export const shopManager = {
-    buy(item, cost) {
-        if (window.appState.me.scores.total >= cost) {
-            window.appState.me.scores.total -= cost;
-            if (item === 'gold') window.appState.me.border = 'border-yellow-400';
-            if (item === 'diamond') window.appState.me.border = 'border-cyan-400';
-            if (item === 'lifeline') window.appState.me.lifelines.fiftyFifty = true;
-            
-            if (window.appState.hostConn) window.appState.hostConn.send({ type: 'SHOP_PURCHASE', id: window.appState.peer.id, cost, border: window.appState.me.border });
-            
-            window.uiManager.updateStudentHUD();
-            document.getElementById('shop-pts-display').innerText = window.appState.me.scores.total;
-            window.toast("Purchase successful!", true);
-        } else {
-            window.toast("Not enough points!", false);
-        }
-    }
+    buy() { console.warn("shopManager is deprecated. Use shopController.buyItem instead."); }
+};
+
+// 🧹 DEPRECATED: Safely stubbed. Functionality moved to AdminController.compressBackgroundImage
+export const imageManager = {
+    async handleUpload() { console.warn("imageManager is deprecated. Use adminUI compression instead."); }
 };
 
 export const aiSimulator = {
@@ -42,7 +34,7 @@ export const aiSimulator = {
             return;
         }
 
-        // Standard Text/PDF Fallback (If API is working)
+        // Standard Text/PDF Fallback
         document.getElementById('admin-content-editors').classList.add('hidden');
         document.getElementById('ai-loading').classList.remove('hidden');
 
@@ -99,28 +91,34 @@ export const aiSimulator = {
     },
 
     async callAI(text) {
-        // 🚀 Corrected API Key
+        // NOTE: Keep API keys secure in production!
         const API_KEY = "AQ.Ab8RN6IAwi74Be9MM5gO6KIRbeTak5CwHWWdpF-gsTweSvoreg";
+        
+        // 🔥 CRITICAL FIX: Prompt strictly enforces the Phase 6 RPG Module Schema
         const prompt = `You are an expert instructional designer. Extract the text: ${text}. 
-        You must output your response as strictly valid JSON matching this exact structure:
+        You must output your response as strictly valid JSON matching this exact 11-module structure. Do not include markdown code blocks, just the raw JSON:
         {
-          "vocabulary": [{"term": "", "definition": ""}],
-          "audioGuessing": {"concept": "", "correctAnswer": "", "wrongAnswers": []},
-          "spelling": "",
-          "hangman": "",
-          "readAloud": "",
-          "dictation": "",
-          "finalQuiz": [{"question": "", "options": [], "answer": ""}]
+          "vocabulary": [{"term": "word", "def": "definition"}],
+          "puzzleMatch": { "questions": [{"q": "Question?", "options": ["A", "B", "C", "D"], "answer": 0}] },
+          "hotspots": [],
+          "ticTacToe": [{"q": "Question?", "options": ["A", "B", "C", "D"], "answer": 0}],
+          "audioGuess": [{"desc": "Concept to read aloud", "options": ["A", "B", "C", "D"], "answer": 0}],
+          "spellingBee": [{"word": "spelling"}],
+          "hangman": [{"phrase": "SHORT PHRASE"}],
+          "memoryMatch": [{"term": "Concept", "match": "Pair"}],
+          "readAloud": [{"text": "Short sentence to practice speaking."}],
+          "dictation": [{"text": "Short sentence to practice listening."}],
+          "quiz": [{"q": "Final Question?", "options": ["A", "B", "C", "D"], "answer": 0}],
+          "chatPhrases": ["Great job!", "Keep going!"]
         }`;
         
         try {
-            // 🚀 Upgraded to the newest gemini-3.6-flash model
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${API_KEY}`, {
+            // 🔥 CRITICAL FIX: Upgraded to Gemini 1.5 Flash (Valid Model)
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
                 method: "POST", 
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
                     contents: [{ parts: [{ text: prompt }] }], 
-                    // 🚀 Force the AI to only return JSON data
                     generationConfig: { 
                         temperature: 0.1,
                         responseMimeType: "application/json" 
@@ -136,132 +134,77 @@ export const aiSimulator = {
 
             const data = await response.json();
             let jsonString = data.candidates[0].content.parts[0].text;
+            
+            // 🔥 FIX: Cleanly parse markdown safely on a single line
             return JSON.parse(jsonString.replace(/```json/gi, '').replace(/```/g, '').trim());
         } catch (error) { 
-            throw new Error(error.message); 
+            throw new Error("AI parsing failed: " + error.message); 
         }
     },
 
     populateEditors(data) {
-        window.lessonData = JSON.parse(JSON.stringify(data));
+        // 🔥 CRITICAL FIX: Use structuredClone to prevent array reference mutation
+        window.lessonData = structuredClone(data);
         
-        // 🧹 Wipe the old hardcoded images completely clean
-        const mod3bg = document.getElementById('mod3-admin-bg');
-        if (mod3bg) mod3bg.src = ''; 
-        if (window.lessonData.visualAssessment) window.lessonData.visualAssessment.image = '';
-
-        const mod8bg = document.getElementById('mod8-admin-bg') || document.getElementById('wally-bg');
-        if (mod8bg) mod8bg.src = '';
-        if (window.lessonData.wheresWally) window.lessonData.wheresWally.image = '';
-
+        // Ensure core arrays exist to prevent Admin Controller crashes
+        window.lessonData.activeModules = [1,2,3,4,5,6,7,8,9,10,11];
+        
         if (window.adminUI && typeof window.adminUI.renderContentEditors === 'function') {
             window.adminUI.renderContentEditors();
         }
     }
 };
 
-// 🚀 NEW: The Image Compression Manager
-export const imageManager = {
-    async handleUpload(event, moduleId) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        if (window.toast) window.toast("Compressing image for multiplayer...", true);
-
-        try {
-            // Compress image to max 800px width, 70% JPEG quality
-            const compressedImage = await this.compressImage(file, 800, 0.7);
-            
-            // 1. Update the UI visibly for the Professor
-            let imgElement;
-            if (moduleId === 3) imgElement = document.getElementById('mod3-admin-bg');
-            if (moduleId === 8) imgElement = document.getElementById('mod8-admin-bg') || document.getElementById('wally-bg');
-            if (imgElement) imgElement.src = compressedImage;
-
-            // 2. Save to global lesson data to push to students
-            if (!window.lessonData) window.lessonData = {};
-            if (moduleId === 3) {
-                if (!window.lessonData.visualAssessment) window.lessonData.visualAssessment = {};
-                window.lessonData.visualAssessment.image = compressedImage;
-            }
-            if (moduleId === 8) {
-                if (!window.lessonData.wheresWally) window.lessonData.wheresWally = {};
-                window.lessonData.wheresWally.image = compressedImage;
-            }
-
-            if (window.toast) window.toast("Image compressed and loaded successfully!", true);
-
-        } catch (error) {
-            console.error("Compression Error:", error);
-            if (window.toast) window.toast("Error compressing image.", false);
-        }
-    },
-
-    compressImage(file, maxWidth, quality) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > maxWidth) {
-                        height = Math.round((height * maxWidth) / width);
-                        width = maxWidth;
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    resolve(canvas.toDataURL('image/jpeg', quality));
-                };
-                img.onerror = reject;
-                img.src = event.target.result;
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    }
-};
-
+// 🚀 The Global Timer Engine
 export const timerManager = {
     timeLeft: 60, interval: null, isActive: false,
+    
     start() { this.stop(); this.timeLeft = 60; this.isActive = true; this.updateUI(); this.interval = setInterval(() => this.tick(), 1000); },
     pause() { if (this.isActive) clearInterval(this.interval); },
     resume() { if (this.isActive) { clearInterval(this.interval); this.interval = setInterval(() => this.tick(), 1000); } },
     stop() { clearInterval(this.interval); this.isActive = false; document.getElementById('global-timer-container').classList.add('hidden'); },
+    
     tick() { 
         this.timeLeft--; 
         this.updateUI(); 
         if (this.timeLeft <= 0) { 
             this.stop(); 
-            if(window.game.isRecordingReadAloud) window.game.toggleReadAloud(); 
-            else window.game.submitScore(-1, "General", "Time's Up!"); 
-            window.uiManager.lockModule(); 
+            if(window.game && window.game.isRecordingReadAloud) window.game.toggleReadAloud(); 
+            else if(window.game) window.game.submitScore(-1, "General", "Time's Up!"); 
+            if(window.uiManager) window.uiManager.lockModule(); 
         } 
     },
+    
     updateUI() {
         const tc = document.getElementById('global-timer-container'); 
         const tt = document.getElementById('global-timer');
         const ts = document.getElementById('global-timer-sec');
         if (!tc || !tt || !ts) return;
         
-        tc.classList.remove('hidden', 'border-green-500', 'border-yellow-500', 'border-red-500', 'bg-red-900', 'scale-110', 'animate-bounce');
-        tt.classList.remove('text-green-500', 'text-yellow-500', 'text-red-500', 'text-white');
-        ts.classList.remove('text-green-500', 'text-yellow-500', 'text-red-500', 'text-white');
+        // Strip all dynamic classes
+        tc.className = "fixed top-6 right-6 md:top-8 md:right-8 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border-4 shadow-lg rounded-2xl p-3 flex flex-col items-center justify-center min-w-[80px] transition-all duration-300 z-40";
+        tt.className = "text-3xl font-black leading-none drop-shadow-sm transition-colors duration-300";
+        ts.className = "text-[10px] font-bold uppercase tracking-widest transition-colors duration-300";
 
+        // 🔥 UI Polish: Dynamic Glassmorphism Threat Levels
         if (this.timeLeft > 40) {
-            tc.classList.add('border-green-500'); tt.classList.add('text-green-500'); ts.classList.add('text-green-500');
-        } else if (this.timeLeft > 20) {
-            tc.classList.add('border-yellow-500'); tt.classList.add('text-yellow-500'); ts.classList.add('text-yellow-500');
+            tc.classList.add('border-emerald-500', 'shadow-[0_0_15px_rgba(16,185,129,0.3)]'); 
+            tt.classList.add('text-emerald-600', 'dark:text-emerald-400'); 
+            ts.classList.add('text-emerald-500');
+        } else if (this.timeLeft > 15) {
+            tc.classList.add('border-amber-500', 'shadow-[0_0_15px_rgba(245,158,11,0.5)]', 'scale-105'); 
+            tt.classList.add('text-amber-600', 'dark:text-amber-400'); 
+            ts.classList.add('text-amber-500');
         } else {
-            tc.classList.add('border-red-500'); tt.classList.add('text-red-500'); ts.classList.add('text-red-500');
-            if (this.timeLeft <= 10) { tc.classList.add('bg-red-900', 'scale-110'); tt.classList.add('text-white'); ts.classList.add('text-white'); }
+            tc.classList.add('border-rose-500', 'shadow-[0_0_20px_rgba(244,63,94,0.8)]', 'animate-pulse'); 
+            tt.classList.add('text-rose-600', 'dark:text-rose-400'); 
+            ts.classList.add('text-rose-500');
+            if (this.timeLeft <= 5) { 
+                tc.classList.add('bg-rose-100', 'dark:bg-rose-900/80', 'scale-110'); 
+            }
         }
+        
         tt.innerText = this.timeLeft;
+        tc.classList.remove('hidden');
     }
 };

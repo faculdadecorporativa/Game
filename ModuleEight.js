@@ -103,9 +103,10 @@ export class ModuleEight extends HTMLElement {
             
             <div class="bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl p-4 md:p-6 rounded-3xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 relative pb-14 transition-all duration-300 w-full mx-auto">
                 
-                <div class="mb-4 flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-2 transition-colors duration-300">
-                    <span id="memory-progress" class="text-sm font-bold text-slate-500 dark:text-slate-300 transition-colors duration-300"></span>
-                    <span class="text-sm font-bold text-indigo-600 dark:text-white transition-colors duration-300">+3 Pts / -1 Pt</span>
+                <!-- 🔥 Premium Score/Progress Header 🔥 -->
+                <div class="mb-6 flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-4 transition-colors duration-300">
+                    <span id="memory-progress" class="text-sm md:text-base font-black text-slate-600 dark:text-slate-300 transition-colors duration-300 tracking-wider uppercase"></span>
+                    <span class="text-xs md:text-sm font-black text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-500/30 px-3 py-1.5 rounded-full shadow-sm transition-colors duration-300">+3 Pts / -1 Pt</span>
                 </div>
                 
                 <div id="memory-grid" class="grid gap-2 md:gap-4 w-full transition-all duration-500"></div>

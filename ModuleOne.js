@@ -10,11 +10,13 @@ export class ModuleOne extends HTMLElement {
 
     render() {
         this.innerHTML = `
+            <!-- STREAMING_CHUNK:Rendering Module 1 Header -->
             <span class="text-indigo-600 dark:text-white font-bold tracking-wider uppercase text-sm transition-colors duration-300">Module 1 of 11</span>
             <h2 class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 mb-6 transition-colors duration-300">Concept Mastery</h2>
             
             <div id="lifeline-mount-1"></div>
             
+            <!-- STREAMING_CHUNK:Rendering Flashcards Container -->
             <!-- 🔥 Unified Premium Glassmorphism Wrapper 🔥 -->
             <div class="bg-white/90 dark:bg-slate-900/40 backdrop-blur-2xl p-6 md:p-10 rounded-3xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 relative overflow-hidden transition-all duration-300 w-full max-w-6xl mx-auto">
                 
