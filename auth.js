@@ -2,7 +2,7 @@
 // Multi-Tenant Logic Layer using strict Database Isolation
 
 import { appStore } from './store.js';
-
+const pb = new window.PocketBase('https://pb.faculdadecorporativa.com.br');
 const EMAIL_CONFIG = {
     serviceID: 'service_zheujzk', 
     templateID: 'template_ovt15kk'
