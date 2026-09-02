@@ -9,77 +9,92 @@ const EMAIL_CONFIG = {
 };
 
 export const authManager = {
-    // --- MULTI-TENANT DATABASE UTILS ---
+    // --- MULTI-TENANT DATABASE UTILS (POCKETBASE SHIM) ---
+    // Simulates Firebase's dynamic path routing using a 'gamedata' collection
     async getDB(node) {
         const profId = appStore.get('currentProfId');
         if (!profId) throw new Error("Critical Error: No Professor ID isolated in state.");
-        const snapshot = await window.firebaseGet(window.firebaseChild(window.firebaseRef(window.firebaseDB), `professors/${profId}/${node}`));
-        return snapshot.exists() ? snapshot.val() : {}; 
+        try {
+            const record = await pb.collection('gamedata').getFirstListItem(`profId="${profId}" && node="${node}"`);
+            return record.data || {};
+        } catch {
+            return {}; 
+        }
     },
     
     async saveDB(data, node) {
         const profId = appStore.get('currentProfId');
         if (!profId) throw new Error("Critical Error: No Professor ID isolated in state.");
-        await window.firebaseSet(window.firebaseRef(window.firebaseDB, `professors/${profId}/${node}`), data); 
+        try {
+            const record = await pb.collection('gamedata').getFirstListItem(`profId="${profId}" && node="${node}"`);
+            await pb.collection('gamedata').update(record.id, { data });
+        } catch {
+            await pb.collection('gamedata').create({ profId, node, data });
+        }
     },
 
     // --- PROFESSOR AUTH: THE GATEKEEPER PROTOCOL ---
     async registerProfessor(email, password, name) {
         if (!email || !password || !name) throw new Error("Name, email, and password are required.");
 
-        const userCredential = await window.firebaseCreateUser(window.firebaseAuth, email, password);
-        const uid = userCredential.user.uid;
-
-        const profData = {
-            uid: uid,
-            name: name,
+        // 1. Create User Account
+        const userRecord = await pb.collection('users').create({
             email: email,
-            status: "pending", 
-            registeredAt: new Date().toISOString()
-        };
-        
-        await window.firebaseSet(window.firebaseRef(window.firebaseDB, `professorsList/${uid}`), profData);
+            password: password,
+            passwordConfirm: password,
+            name: name,
+            emailVisibility: true
+        });
 
+        // 2. Create Professor Profile in 'players' collection
+        const profData = {
+            user: userRecord.id,
+            nickname: name,
+            role: 'professor',
+            status: 'pending'
+        };
+        await pb.collection('players').create(profData);
+
+        // 3. Admin Notification
         if (typeof emailjs !== 'undefined') {
             try {
-                const firebaseLink = `https://console.firebase.google.com/project/elearning-game-28b64/database/elearning-game-28b64-default-rtdb/data/professorsList/${uid}`;
+                const adminLink = `https://pb.faculdadecorporativa.com.br/_/`;
                 await emailjs.send(EMAIL_CONFIG.serviceID, EMAIL_CONFIG.templateID, {
                     prof_name: name,
                     prof_email: email,
                     page_name: "E-Learning Platform",
-                    action_link: firebaseLink
+                    action_link: adminLink
                 });
             } catch (emailError) { console.error("❌ EmailJS failed:", emailError); }
         }
 
-        await window.firebaseSignOut(window.firebaseAuth);
-        return userCredential;
+        pb.authStore.clear(); // Sign out after registration
+        return { user: userRecord };
     },
 
     async loginProfessor(email, password) {
         if (!email || !password) throw new Error("Email and password are required.");
         
-        const userCredential = await window.firebaseSignIn(window.firebaseAuth, email, password);
-        const uid = userCredential.user.uid;
-
-        const profSnapshot = await window.firebaseGet(window.firebaseChild(window.firebaseRef(window.firebaseDB), `professorsList/${uid}`));
+        const authData = await pb.collection('users').authWithPassword(email, password);
         
-        if (!profSnapshot.exists()) {
-            await window.firebaseSignOut(window.firebaseAuth);
+        // Find corresponding profile in players collection
+        let profProfile;
+        try {
+            profProfile = await pb.collection('players').getFirstListItem(`user="${authData.record.id}"`);
+        } catch (err) {
+            pb.authStore.clear();
             throw new Error("Professor profile not found. Please contact management.");
         }
 
-        const profData = profSnapshot.val();
-
-        if (profData.status !== "approved") {
-            await window.firebaseSignOut(window.firebaseAuth);
+        if (profProfile.status !== "approved") {
+            pb.authStore.clear();
             throw new Error("Your account is pending management approval.");
         }
 
         appStore.set('role', 'host');
-        appStore.set('currentProfId', uid);
-        appStore.set('profName', profData.name); 
-        return userCredential;
+        appStore.set('currentProfId', authData.record.id);
+        appStore.set('profName', profProfile.nickname); 
+        return authData;
     },
 
     // --- STUDENT AUTH (WITH PENDING APPROVAL QUEUE) ---
@@ -93,17 +108,34 @@ export const authManager = {
         const phone = countryCode + cleanPhoneInput;
         const shadowEmail = `${phone}_${Date.now()}@student.app.com`;
         
-        const userCredential = await window.firebaseCreateUser(window.firebaseAuth, shadowEmail, password);
+        // 1. Create Shadow Auth User
+        const userRecord = await pb.collection('users').create({
+            email: shadowEmail,
+            password: password,
+            passwordConfirm: password,
+            name: name || "Student"
+        });
         
         const teams = appStore.get('teams') || [{id: 'eagle'}];
         const rTeam = teams[Math.floor(Math.random() * teams.length)].id;
         const finalName = name || "Student";
         
-        const studentData = { uid: userCredential.user.uid, name: finalName, avatar, team: rTeam, shadowEmail, status: 'pending' }; 
-        await this.saveDB(studentData, `students/${phone}`);
+        // 2. Save Student Profile to 'players' collection
+        const studentData = { 
+            user: userRecord.id, 
+            nickname: finalName, 
+            avatar: avatar, 
+            team: rTeam, 
+            shadowEmail: shadowEmail,
+            phone: phone,
+            professorId: profId,
+            role: 'student',
+            status: 'pending' 
+        }; 
+        await pb.collection('players').create(studentData);
         
         appStore.set('role', 'student');
-        return userCredential;
+        return { user: userRecord };
     },
 
     async loginStudent(countryCode, phoneInput, password, profId) {
@@ -115,37 +147,33 @@ export const authManager = {
         appStore.set('currentProfId', profId);
         const phone = countryCode + cleanPhoneInput;
         
-        const studentProfile = await this.getDB(`students/${phone}`);
-        if (!studentProfile || Object.keys(studentProfile).length === 0) throw new Error("Profile not found. Please register first.");
+        // 1. Fetch Student Profile by Phone & Professor ID
+        let studentProfile;
+        try {
+            studentProfile = await pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
+        } catch (err) {
+            throw new Error("Profile not found. Please register first.");
+        }
         
         if (studentProfile.status === 'pending') throw new Error("Account pending. Please wait for your professor to approve you.");
         
-        const shadowEmail = studentProfile.shadowEmail || `${phone}@student.app.com`;
-        let userCredential;
+        const shadowEmail = studentProfile.shadowEmail;
+        let authData;
 
         try {
-            // Try standard login first
-            userCredential = await window.firebaseSignIn(window.firebaseAuth, shadowEmail, password);
+            authData = await pb.collection('users').authWithPassword(shadowEmail, password);
         } catch (error) {
-            // AUTO-FIX MAGIC: If manually added by a professor, create their login right now silently
-            try {
-                userCredential = await window.firebaseCreateUser(window.firebaseAuth, shadowEmail, password);
-                studentProfile.uid = userCredential.user.uid;
-                studentProfile.shadowEmail = shadowEmail;
-                await this.saveDB(studentProfile, `students/${phone}`);
-            } catch (fallbackError) {
-                console.error("Login fallback failed:", fallbackError);
-                throw new Error("Incorrect password. Please try again.");
-            }
+            console.error("Login failed:", error);
+            throw new Error("Incorrect password. Please try again.");
         }
         
         const teams = appStore.get('teams') || [{id: 'eagle'}];
         
         // 🔥 CRITICAL FIX: Ensure the ENTIRE Phase 3 RPG Payload is loaded seamlessly 🔥
         const newMe = { 
-            uid: studentProfile.uid || userCredential.user.uid,
+            uid: authData.record.id,
             phone: phone, 
-            name: studentProfile.name, 
+            name: studentProfile.nickname, 
             avatar: studentProfile.avatar, 
             team: studentProfile.team || teams[0].id, 
             border: studentProfile.border || 'border-slate-300', 
@@ -162,7 +190,7 @@ export const authManager = {
         appStore.set('me', newMe);
         appStore.set('role', 'student');
         
-        return userCredential;
+        return authData;
     },
 
     async sendRecoveryCode(countryCode, phoneInput, profId) {
@@ -173,10 +201,15 @@ export const authManager = {
         appStore.set('currentProfId', profId);
         const phone = countryCode + cleanPhoneInput;
         
-        const studentProfile = await this.getDB(`students/${phone}`);
-        const shadowEmail = studentProfile?.shadowEmail || `${phone}@student.app.com`;
-        
-        await window.firebaseReset(window.firebaseAuth, shadowEmail);
+        let studentProfile;
+        try {
+            studentProfile = await pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
+        } catch (err) {
+             throw new Error("Profile not found.");
+        }
+
+        const shadowEmail = studentProfile.shadowEmail;
+        await pb.collection('users').requestPasswordReset(shadowEmail);
         return shadowEmail; 
     }
 };
