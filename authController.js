@@ -1,6 +1,9 @@
 // authController.js
 // Strict Gatekeeper Version with Canvas Compression & RPG Safety
 
+// NEW: Imported appStore to update local game state when avatar changes
+import { appStore } from './store.js';
+
 export const authUI = {
     isProfRegistering: false,
     isRegistering: false,
@@ -313,3 +316,31 @@ document.addEventListener("DOMContentLoaded", () => {
     enableEnter("s-phone", "submitStudentAuth");
     enableEnter("s-pass", "submitStudentAuth");
 });
+
+// --- NEW: POCKETBASE AVATAR SELECTION ---
+export async function handleCharacterSelection(userId, imageName) {
+    try {
+        // 1. Update the PocketBase database with the exact filename string
+        // Assuming 'pb' is attached to the window object or globally available
+        await window.pb.collection('users').update(userId, {
+            avatar: imageName 
+        });
+
+        // 2. Update your local appStore so the game's UI reflects the change immediately
+        let me = appStore.get('me');
+        if (me) {
+            me.avatar = imageName;
+            appStore.set('me', me);
+        }
+
+        if (window.toast) window.toast("Character selected successfully!", true);
+        
+        // Optional: Close the character selection modal if you have one
+        // const modal = document.getElementById('character-modal');
+        // if (modal) modal.classList.add('hidden');
+
+    } catch (error) {
+        console.error("Failed to update avatar in PocketBase:", error);
+        if (window.toast) window.toast("Error saving character.", false);
+    }
+}
