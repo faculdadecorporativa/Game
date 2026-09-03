@@ -1,16 +1,38 @@
-// 🏗️ auth.js
-// Multi-Tenant Logic Layer using strict Database Isolation
+// auth.js
+// Multi-Tenant Logic Layer using PocketBase Database Isolation
 
 import { appStore } from './store.js';
-const pb = new window.PocketBase('https://pb.faculdadecorporativa.com.br');
+
+// Initialize PocketBase instance and expose globally if needed
+export const pb = window.pb || new window.PocketBase('https://pb.faculdadecorporativa.com.br');
+window.pb = pb;
+
 const EMAIL_CONFIG = {
     serviceID: 'service_zheujzk', 
     templateID: 'template_ovt15kk'
 };
 
 export const authManager = {
-    // --- MULTI-TENANT DATABASE UTILS (POCKETBASE SHIM) ---
-    // Simulates Firebase's dynamic path routing using a 'gamedata' collection
+    // --- FETCH APPROVED PROFESSORS ---
+    async getProfessors() {
+        try {
+            const records = await pb.collection('players').getFullList({
+                filter: 'role="professor"'
+            });
+            return records;
+        } catch (err) {
+            console.error("Failed to fetch professors list:", err);
+            return [];
+        }
+    },
+
+    // --- RESET PROFESSOR PASSWORD ---
+    async resetProfessorPassword(email) {
+        if (!email) throw new Error("Email is required.");
+        return await pb.collection('users').requestPasswordReset(email);
+    },
+
+    // --- MULTI-TENANT DATABASE UTILS ---
     async getDB(node) {
         const profId = appStore.get('currentProfId');
         if (!profId) throw new Error("Critical Error: No Professor ID isolated in state.");
@@ -55,7 +77,7 @@ export const authManager = {
         };
         await pb.collection('players').create(profData);
 
-        // 3. Admin Notification
+        // 3. Admin Notification via EmailJS
         if (typeof emailjs !== 'undefined') {
             try {
                 const adminLink = `https://pb.faculdadecorporativa.com.br/_/`;
@@ -65,10 +87,12 @@ export const authManager = {
                     page_name: "E-Learning Platform",
                     action_link: adminLink
                 });
-            } catch (emailError) { console.error("❌ EmailJS failed:", emailError); }
+            } catch (emailError) { 
+                console.error("❌ EmailJS failed:", emailError); 
+            }
         }
 
-        pb.authStore.clear(); // Sign out after registration
+        pb.authStore.clear(); 
         return { user: userRecord };
     },
 
@@ -77,7 +101,6 @@ export const authManager = {
         
         const authData = await pb.collection('users').authWithPassword(email, password);
         
-        // Find corresponding profile in players collection
         let profProfile;
         try {
             profProfile = await pb.collection('players').getFirstListItem(`user="${authData.record.id}"`);
@@ -97,11 +120,13 @@ export const authManager = {
         return authData;
     },
 
-    // --- STUDENT AUTH (WITH PENDING APPROVAL QUEUE) ---
+    // --- STUDENT AUTH ---
     async registerStudent(countryCode, phoneInput, password, name, avatar, profId) {
         const cleanPhoneInput = String(phoneInput).replace(/\D/g, '');
-        if(!cleanPhoneInput || !password || !/^\d{8,15}$/.test(cleanPhoneInput)) throw new Error("Please enter a valid numeric phone number (8-15 digits).");
-        if(!profId) throw new Error("Please select a Professor.");
+        if (!cleanPhoneInput || !password || !/^\d{8,15}$/.test(cleanPhoneInput)) {
+            throw new Error("Please enter a valid numeric phone number (8-15 digits).");
+        }
+        if (!profId) throw new Error("Please select a Professor.");
 
         appStore.set('currentProfId', profId);
 
@@ -116,11 +141,11 @@ export const authManager = {
             name: name || "Student"
         });
         
-        const teams = appStore.get('teams') || [{id: 'eagle'}];
+        const teams = appStore.get('teams') || [{ id: 'eagle' }];
         const rTeam = teams[Math.floor(Math.random() * teams.length)].id;
         const finalName = name || "Student";
         
-        // 2. Save Student Profile to 'players' collection
+        // 2. Save Student Profile
         const studentData = { 
             user: userRecord.id, 
             nickname: finalName, 
@@ -140,14 +165,12 @@ export const authManager = {
 
     async loginStudent(countryCode, phoneInput, password, profId) {
         const cleanPhoneInput = String(phoneInput).replace(/\D/g, '');
-        if(!cleanPhoneInput || !password) throw new Error("Phone and password are required.");
-        
-        if(!profId || profId === "undefined" || profId === "") throw new Error("Please select your Professor.");
+        if (!cleanPhoneInput || !password) throw new Error("Phone and password are required.");
+        if (!profId || profId === "undefined" || profId === "") throw new Error("Please select your Professor.");
 
         appStore.set('currentProfId', profId);
         const phone = countryCode + cleanPhoneInput;
         
-        // 1. Fetch Student Profile by Phone & Professor ID
         let studentProfile;
         try {
             studentProfile = await pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
@@ -155,7 +178,9 @@ export const authManager = {
             throw new Error("Profile not found. Please register first.");
         }
         
-        if (studentProfile.status === 'pending') throw new Error("Account pending. Please wait for your professor to approve you.");
+        if (studentProfile.status === 'pending') {
+            throw new Error("Account pending. Please wait for your professor to approve you.");
+        }
         
         const shadowEmail = studentProfile.shadowEmail;
         let authData;
@@ -167,9 +192,8 @@ export const authManager = {
             throw new Error("Incorrect password. Please try again.");
         }
         
-        const teams = appStore.get('teams') || [{id: 'eagle'}];
+        const teams = appStore.get('teams') || [{ id: 'eagle' }];
         
-        // 🔥 CRITICAL FIX: Ensure the ENTIRE Phase 3 RPG Payload is loaded seamlessly 🔥
         const newMe = { 
             uid: authData.record.id,
             phone: phone, 
@@ -177,7 +201,7 @@ export const authManager = {
             avatar: studentProfile.avatar, 
             team: studentProfile.team || teams[0].id, 
             border: studentProfile.border || 'border-slate-300', 
-            scores: studentProfile.scores || { total:0, Speaking:0, Writing:0, Listening:0, General:0 }, 
+            scores: studentProfile.scores || { total: 0, Speaking: 0, Writing: 0, Listening: 0, General: 0 }, 
             lifelines: studentProfile.lifelines || { fiftyFifty: true, askProf: true, google: true, callFriend: true, freezeTime: true, timeBurn: true }, 
             streak: studentProfile.streak || 0,
             maxStreak: studentProfile.maxStreak || 0,
@@ -195,8 +219,8 @@ export const authManager = {
 
     async sendRecoveryCode(countryCode, phoneInput, profId) {
         const cleanPhoneInput = String(phoneInput).replace(/\D/g, '');
-        if(!/^\d{8,15}$/.test(cleanPhoneInput)) throw new Error("Enter a valid numeric phone number.");
-        if(!profId) throw new Error("Select your professor first.");
+        if (!/^\d{8,15}$/.test(cleanPhoneInput)) throw new Error("Enter a valid numeric phone number.");
+        if (!profId) throw new Error("Select your professor first.");
         
         appStore.set('currentProfId', profId);
         const phone = countryCode + cleanPhoneInput;
@@ -205,7 +229,7 @@ export const authManager = {
         try {
             studentProfile = await pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
         } catch (err) {
-             throw new Error("Profile not found.");
+            throw new Error("Profile not found.");
         }
 
         const shadowEmail = studentProfile.shadowEmail;

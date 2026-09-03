@@ -1,8 +1,8 @@
 // authController.js
-// Strict Gatekeeper Version with Canvas Compression & RPG Safety
+// Gatekeeper UI Controller (PocketBase Integrated)
 
-// NEW: Imported appStore to update local game state when avatar changes
 import { appStore } from './store.js';
+import { authManager } from './auth.js';
 
 export const authUI = {
     isProfRegistering: false,
@@ -23,24 +23,17 @@ export const authUI = {
         selectEl.innerHTML = '<option value="" disabled selected>Select a Professor...</option>';
 
         try {
-            if (window.firebaseRef && window.firebaseGet && window.firebaseDB) {
-                const profRef = window.firebaseRef(window.firebaseDB, 'professorsList');
-                const snapshot = await window.firebaseGet(profRef);
-                
-                if (snapshot.exists()) {
-                    const professors = snapshot.val();
-                    for (let key in professors) {
-                        const prof = professors[key];
-                        const option = document.createElement('option');
-                        option.value = prof.uid || key;
-                        option.textContent = prof.name || prof.email || key;
-                        selectEl.appendChild(option);
-                    }
-                } else {
-                    selectEl.innerHTML += '<option value="" disabled>No professors registered.</option>';
-                }
+            const professors = await authManager.getProfessors();
+            
+            if (professors && professors.length > 0) {
+                professors.forEach(prof => {
+                    const option = document.createElement('option');
+                    option.value = prof.user || prof.id;
+                    option.textContent = prof.nickname || prof.name || "Professor";
+                    selectEl.appendChild(option);
+                });
             } else {
-                console.warn("Firebase references not fully loaded for professor list.");
+                selectEl.innerHTML += '<option value="" disabled>No professors registered.</option>';
             }
         } catch (error) {
             console.error("Error loading professors:", error);
@@ -80,7 +73,7 @@ export const authUI = {
                 
                 const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
                 previewImgs.forEach(img => {
-                    if(img) img.src = compressedData;
+                    if (img) img.src = compressedData;
                 });
             });
         }
@@ -90,7 +83,7 @@ export const authUI = {
         this.isProfRegistering = false;
         this.updateProfAuthUI();
         if (window.uiManager) window.uiManager.closeModals(); 
-        document.getElementById('modal-prof-login').classList.remove('hidden'); 
+        document.getElementById('modal-prof-login')?.classList.remove('hidden'); 
     },
 
     toggleProfAuthMode() {
@@ -99,24 +92,27 @@ export const authUI = {
     },
 
     updateProfAuthUI() {
-        document.getElementById('p-auth-title').innerText = this.isProfRegistering ? "Professor Registration" : "Professor Login";
-        document.getElementById('p-auth-btn').innerText = this.isProfRegistering ? "Register & Request Approval" : "Login";
-        document.getElementById('p-toggle-btn').innerText = this.isProfRegistering ? "Already approved? Login here" : "Need an account? Register";
-        document.getElementById('p-register-fields').classList.toggle('hidden', !this.isProfRegistering);
-        
+        const titleEl = document.getElementById('p-auth-title');
+        const btnEl = document.getElementById('p-auth-btn');
+        const toggleEl = document.getElementById('p-toggle-btn');
+        const regFields = document.getElementById('p-register-fields');
         const forgotBtn = document.getElementById('p-forgot-pass-container');
+
+        if (titleEl) titleEl.innerText = this.isProfRegistering ? "Professor Registration" : "Professor Login";
+        if (btnEl) btnEl.innerText = this.isProfRegistering ? "Register & Request Approval" : "Login";
+        if (toggleEl) toggleEl.innerText = this.isProfRegistering ? "Already approved? Login here" : "Need an account? Register";
+        if (regFields) regFields.classList.toggle('hidden', !this.isProfRegistering);
         if (forgotBtn) forgotBtn.classList.toggle('hidden', this.isProfRegistering);
     },
     
     async submitProfAuth() {
-        const inputEmail = document.getElementById('prof-email').value.trim();
-        const inputPass = document.getElementById('prof-pass').value.trim();
+        const inputEmail = document.getElementById('prof-email')?.value.trim();
+        const inputPass = document.getElementById('prof-pass')?.value.trim();
         const nameEl = document.getElementById('prof-name');
         const inputName = nameEl ? nameEl.value.trim() : '';
         const authBtn = document.getElementById('p-auth-btn');
         
         try {
-            // UI Polish: Loading State
             if (authBtn) {
                 authBtn.innerText = "Authenticating...";
                 authBtn.disabled = true;
@@ -124,12 +120,12 @@ export const authUI = {
             }
 
             if (this.isProfRegistering) {
-                await window.authManager.registerProfessor(inputEmail, inputPass, inputName);
-                if(window.toast) window.toast("Registration sent to Management for approval!", true);
+                await authManager.registerProfessor(inputEmail, inputPass, inputName);
+                if (window.toast) window.toast("Registration sent to Management for approval!", true);
                 this.toggleProfAuthMode();
             } else {
-                await window.authManager.loginProfessor(inputEmail, inputPass);
-                if(window.toast) window.toast("Professor authenticated securely.", true);
+                await authManager.loginProfessor(inputEmail, inputPass);
+                if (window.toast) window.toast("Professor authenticated securely.", true);
                 
                 if (window.databaseJanitor) {
                     window.databaseJanitor.runCleanup();
@@ -144,9 +140,8 @@ export const authUI = {
                 }
             }
         } catch (error) {
-            if(window.toast) window.toast(`Auth Failed: ${error.message}`, false);
+            if (window.toast) window.toast(`Auth Failed: ${error.message}`, false);
         } finally {
-            // UI Polish: Restore Button State
             if (authBtn) {
                 authBtn.innerText = this.isProfRegistering ? "Register & Request Approval" : "Login";
                 authBtn.disabled = false;
@@ -159,38 +154,31 @@ export const authUI = {
         const email = document.getElementById('prof-email')?.value.trim();
         
         if (!email) {
-            if(window.toast) window.toast("Please enter your email address in the top box first to reset your password.", false);
-            if(window.sfx) window.sfx.play('wrong');
+            if (window.toast) window.toast("Please enter your email address in the top box first to reset your password.", false);
+            if (window.sfx) window.sfx.play('wrong');
             return;
         }
 
         try {
-            if (window.firebaseReset && window.firebaseAuth) {
-                await window.firebaseReset(window.firebaseAuth, email);
-                if(window.toast) window.toast("Password reset email sent! Check your inbox.", true);
-                if(window.sfx) window.sfx.play('correct');
-            } else {
-                console.error("Firebase auth/reset methods not bound to window.");
-            }
+            await authManager.resetProfessorPassword(email);
+            if (window.toast) window.toast("Password reset email sent! Check your inbox.", true);
+            if (window.sfx) window.sfx.play('correct');
         } catch (error) {
-            let errorMsg = "Failed to send reset email.";
-            if (error.code === 'auth/user-not-found') errorMsg = "No account found with this email.";
-            if (error.code === 'auth/invalid-email') errorMsg = "Invalid email format.";
-            if(window.toast) window.toast(errorMsg, false);
-            if(window.sfx) window.sfx.play('wrong');
+            if (window.toast) window.toast(`Failed: ${error.message}`, false);
+            if (window.sfx) window.sfx.play('wrong');
         }
     },
 
     showStudentAuth() { 
         this.isRegistering = false;
-        // Reset temp avatar so it doesn't bleed over from previous interactions
         this.tempAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        
         const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
-        previewImgs.forEach(img => { if(img) img.src = this.tempAvatar; });
+        previewImgs.forEach(img => { if (img) img.src = this.tempAvatar; });
 
         this.updateAuthUI(); 
-        if(window.uiManager) window.uiManager.closeModals(); 
-        document.getElementById('modal-student-auth').classList.remove('hidden'); 
+        if (window.uiManager) window.uiManager.closeModals(); 
+        document.getElementById('modal-student-auth')?.classList.remove('hidden'); 
         
         this.loadProfessorsDropdown();
     },
@@ -201,17 +189,22 @@ export const authUI = {
     },
     
     updateAuthUI() {
-        document.getElementById('s-auth-title').innerText = this.isRegistering ? "Student Registration" : "Student Login";
-        document.getElementById('s-auth-btn').innerText = this.isRegistering ? "Register & Continue" : "Login";
-        document.getElementById('s-toggle-btn').innerText = this.isRegistering ? "Already have an account? Login" : "Need an account? Register";
-        document.getElementById('s-register-fields').classList.toggle('hidden', !this.isRegistering);
+        const titleEl = document.getElementById('s-auth-title');
+        const btnEl = document.getElementById('s-auth-btn');
+        const toggleEl = document.getElementById('s-toggle-btn');
+        const regFields = document.getElementById('s-register-fields');
+
+        if (titleEl) titleEl.innerText = this.isRegistering ? "Student Registration" : "Student Login";
+        if (btnEl) btnEl.innerText = this.isRegistering ? "Register & Continue" : "Login";
+        if (toggleEl) toggleEl.innerText = this.isRegistering ? "Already have an account? Login" : "Need an account? Register";
+        if (regFields) regFields.classList.toggle('hidden', !this.isRegistering);
     },
 
     async submitStudentAuth() {
-        const cc = document.getElementById('s-cc').value;
-        const rawPhone = document.getElementById('s-phone').value;
+        const cc = document.getElementById('s-cc')?.value;
+        const rawPhone = document.getElementById('s-phone')?.value || '';
         const phone = rawPhone.replace(/\D/g, ''); 
-        const pass = document.getElementById('s-pass').value.trim();
+        const pass = document.getElementById('s-pass')?.value.trim();
         const nameEl = document.getElementById('s-name');
         const name = nameEl ? nameEl.value.trim() : '';
         const profSelect = document.getElementById('professor-select');
@@ -223,7 +216,6 @@ export const authUI = {
             if (!phone) throw new Error("Please enter your Phone Number.");
             if (phone.length < 6) throw new Error("Please enter a valid Phone Number.");
 
-            // UI Polish: Loading State
             if (authBtn) {
                 authBtn.innerText = "Authenticating...";
                 authBtn.disabled = true;
@@ -233,19 +225,21 @@ export const authUI = {
             if (this.isRegistering) {
                 if (!profId) throw new Error("Please select a Professor.");
                 
-                await window.authManager.registerStudent(cc, phone, pass, name, this.tempAvatar, profId);
+                await authManager.registerStudent(cc, phone, pass, name, this.tempAvatar, profId);
                 
-                if(window.toast) window.toast(`Account registered! Waiting for professor approval.`, true);
-                
+                if (window.toast) window.toast(`Account registered! Waiting for professor approval.`, true);
                 if (window.uiManager) window.uiManager.closeModals();
                 return; 
                 
             } else {
-                await window.authManager.loginStudent(cc, phone, pass, profId);
-                if(window.toast) window.toast("Login successful!", true);
+                await authManager.loginStudent(cc, phone, pass, profId);
+                if (window.toast) window.toast("Login successful!", true);
                 
-                if (window.firebaseAuth && window.firebaseAuth.currentUser && window.syncManager) {
-                    window.syncManager.startMirroring(window.firebaseAuth.currentUser.uid);
+                if (window.syncManager) {
+                    const currentUser = window.pb?.authStore?.model;
+                    if (currentUser) {
+                        window.syncManager.startMirroring(currentUser.id);
+                    }
                 }
             }
 
@@ -267,9 +261,8 @@ export const authUI = {
             }, 0);
 
         } catch (error) {
-            if(window.toast) window.toast(error.message, false);
+            if (window.toast) window.toast(error.message, false);
         } finally {
-            // UI Polish: Restore Button State
             if (authBtn) {
                 authBtn.innerText = this.isRegistering ? "Register & Continue" : "Login";
                 authBtn.disabled = false;
@@ -278,22 +271,18 @@ export const authUI = {
         }
     },
 
-    // --- NEW: Classroom-Secure Recovery Flow ---
     showRecovery() {
-        if(window.uiManager) window.uiManager.closeModals(); 
-        document.getElementById('modal-recovery').classList.remove('hidden'); 
+        if (window.uiManager) window.uiManager.closeModals(); 
+        document.getElementById('modal-recovery')?.classList.remove('hidden'); 
     },
 
     sendCode() {
-        // Shadow Emails cannot receive actual Firebase reset emails. 
-        // Intercepting and enforcing a secure Classroom Management flow.
         if (window.uiManager) window.uiManager.closeModals(); 
         if (window.sfx) window.sfx.play('alert');
-        window.toast("🔒 For security, please ask your Professor to instantly reset your password from their Control Center.", false);
+        if (window.toast) window.toast("🔒 For security, please ask your Professor to instantly reset your password from their Control Center.", false);
     },
 
     resetPassword() {
-        // Fallback catch (UI should prevent reaching here natively)
         this.sendCode();
     }
 };
@@ -317,16 +306,12 @@ document.addEventListener("DOMContentLoaded", () => {
     enableEnter("s-pass", "submitStudentAuth");
 });
 
-// --- NEW: POCKETBASE AVATAR SELECTION ---
 export async function handleCharacterSelection(userId, imageName) {
     try {
-        // 1. Update the PocketBase database with the exact filename string
-        // Assuming 'pb' is attached to the window object or globally available
-        await window.pb.collection('users').update(userId, {
-            avatar: imageName 
-        });
+        if (!window.pb) throw new Error("PocketBase client not found.");
 
-        // 2. Update your local appStore so the game's UI reflects the change immediately
+        await window.pb.collection('users').update(userId, { avatar: imageName });
+
         let me = appStore.get('me');
         if (me) {
             me.avatar = imageName;
@@ -334,10 +319,6 @@ export async function handleCharacterSelection(userId, imageName) {
         }
 
         if (window.toast) window.toast("Character selected successfully!", true);
-        
-        // Optional: Close the character selection modal if you have one
-        // const modal = document.getElementById('character-modal');
-        // if (modal) modal.classList.add('hidden');
 
     } catch (error) {
         console.error("Failed to update avatar in PocketBase:", error);
