@@ -120,11 +120,22 @@ export const authUI = {
             }
 
             if (this.isProfRegistering) {
+                // Register via PocketBase (default role: 'professor', approved: false)
                 await authManager.registerProfessor(inputEmail, inputPass, inputName);
                 if (window.toast) window.toast("Registration sent to Management for approval!", true);
                 this.toggleProfAuthMode();
             } else {
+                // Log in via PocketBase
                 await authManager.loginProfessor(inputEmail, inputPass);
+                
+                // PocketBase Approval Verification Check
+                const user = window.pb?.authStore?.record || window.pb?.authStore?.model;
+                if (user && user.role === 'professor' && !user.approved) {
+                    // Revoke local token/session immediately if pending approval
+                    if (window.pb?.authStore) window.pb.authStore.clear();
+                    throw new Error("Your account is pending approval by Management.");
+                }
+
                 if (window.toast) window.toast("Professor authenticated securely.", true);
                 
                 if (window.databaseJanitor) {
@@ -236,7 +247,7 @@ export const authUI = {
                 if (window.toast) window.toast("Login successful!", true);
                 
                 if (window.syncManager) {
-                    const currentUser = window.pb?.authStore?.model;
+                    const currentUser = window.pb?.authStore?.record || window.pb?.authStore?.model;
                     if (currentUser) {
                         window.syncManager.startMirroring(currentUser.id);
                     }

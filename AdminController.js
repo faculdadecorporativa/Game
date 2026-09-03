@@ -23,11 +23,12 @@ export const adminUI = {
 
         this.renderContentEditors(); 
         
-        // 🔥 FIX: The drawing board will now successfully initialize!
+        // 🛠️ FIX: The drawing board will now successfully initialize!
         this.setupDrawingBoard('mod3-draw-container'); 
-        // 🔥 FIX: Purged legacy mod8-draw-container initialization that caused background errors!
+        // 🛠️ FIX: Purged legacy mod8-draw-container initialization that caused background errors!
         this.renderTeams(); 
         this.renderStudentManagement(); 
+        this.fetchPendingProfessors();
         this.updateLobbyList();
     },
 
@@ -252,7 +253,7 @@ export const adminUI = {
         } 
     },
     
-    // 🔥 FIX: Properly saves the Mod 3 Image to the Database Payload!
+    // 🛠️ FIX: Properly saves the Mod 3 Image to the Database Payload!
     handleBgUpload(e, imgId, destId) { 
         const f = e.target.files[0]; 
         if(f) { 
@@ -343,6 +344,75 @@ export const adminUI = {
             });
         } catch (error) {
             window.toast(`Update failed: ${error.message}`, false);
+        }
+    },
+
+    async fetchPendingProfessors() {
+        const container = document.getElementById('pending-professors-list');
+        const wrapper = document.getElementById('pending-professors-wrapper');
+        
+        try {
+            if (window.firebaseRef && window.firebaseGet && window.firebaseDB) {
+                const profsRef = window.firebaseRef(window.firebaseDB, 'professorsList');
+                const snapshot = await window.firebaseGet(profsRef);
+
+                if (snapshot.exists()) {
+                    const professors = snapshot.val();
+                    let pendingCount = 0;
+                    if (container) container.innerHTML = '';
+
+                    for (let id in professors) {
+                        const prof = professors[id];
+                        if (prof.status === 'pending') {
+                            pendingCount++;
+                            if (container) {
+                                container.innerHTML += `
+                                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border border-amber-200 dark:border-amber-500/30 rounded-xl bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-3 transition-all">
+                                    <div class="flex-1">
+                                        <p class="font-bold text-slate-800 dark:text-slate-200">${prof.name || 'Professor'}</p>
+                                        <span class="text-xs font-mono text-slate-500">${prof.email || id}</span>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button onclick="adminUI.approveProfessor('${id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Approve</button>
+                                        <button onclick="adminUI.denyProfessor('${id}')" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Deny</button>
+                                    </div>
+                                </div>`;
+                            }
+                        }
+                    }
+
+                    if (wrapper) wrapper.classList.toggle('hidden', pendingCount === 0);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch pending professors", e);
+        }
+    },
+
+    async approveProfessor(profId) {
+        try {
+            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
+                const statusRef = window.firebaseRef(window.firebaseDB, `professorsList/${profId}/status`);
+                await window.firebaseSet(statusRef, 'approved');
+                window.toast("Professor approved successfully!", true);
+                this.fetchPendingProfessors();
+            }
+        } catch (err) {
+            window.toast(`Failed to approve professor: ${err.message}`, false);
+        }
+    },
+
+    async denyProfessor(profId) {
+        if (!confirm("Are you sure you want to deny this professor account request?")) return;
+        try {
+            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
+                const profRef = window.firebaseRef(window.firebaseDB, `professorsList/${profId}`);
+                await window.firebaseSet(profRef, null);
+                window.toast("Professor request denied and removed.", true);
+                this.fetchPendingProfessors();
+            }
+        } catch (err) {
+            window.toast(`Failed to deny professor: ${err.message}`, false);
         }
     },
 
@@ -791,7 +861,7 @@ export const adminUI = {
         }
     },
     
-    // 🔥 NEW: Premium Drawing Board Logic for Visual Assessment 🔥
+    // 🛠️ NEW: Premium Drawing Board Logic for Visual Assessment 🛠️
     setupDrawingBoard(containerId) {
         const container = document.getElementById(containerId);
         if (!container) return;
