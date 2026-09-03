@@ -65,13 +65,15 @@ export const authManager = {
     async registerProfessor(email, password, name) {
         if (!email || !password || !name) throw new Error("Name, email, and password are required.");
 
-        // 1. Create User Account
+        // 1. Create User Account (Added role and status to match PB schema rules)
         const userRecord = await pb.collection('users').create({
             email: email,
             password: password,
             passwordConfirm: password,
             name: name,
-            emailVisibility: true
+            emailVisibility: true,
+            role: 'professor',
+            status: 'pending' // Enforces the PB Auth Rule block
         });
 
         // 2. Create Professor Profile in 'players' collection
@@ -113,7 +115,14 @@ export const authManager = {
     async loginProfessor(email, password) {
         if (!email || !password) throw new Error("Email and password are required.");
 
-        const authData = await pb.collection('users').authWithPassword(email, password);
+        let authData;
+        try {
+            // This will automatically fail if status != "approved" due to your PocketBase Auth Rule
+            authData = await pb.collection('users').authWithPassword(email, password);
+        } catch (error) {
+            pb.authStore.clear();
+            throw new Error("Your account is pending management approval or credentials are invalid.");
+        }
 
         let profProfile;
         try {
@@ -123,7 +132,8 @@ export const authManager = {
             throw new Error("Professor profile not found. Please contact management.");
         }
 
-        if (profProfile.status !== "approved") {
+        // Fallback check just in case rules are bypassed
+        if (profProfile.status !== "approved" && authData.record.status !== "approved") {
             pb.authStore.clear();
             throw new Error("Your account is pending management approval.");
         }
@@ -155,12 +165,14 @@ export const authManager = {
 
         const shadowEmail = `${phone}_${Date.now()}@student.app.com`;
 
-        // 1. Create Shadow Auth User
+        // 1. Create Shadow Auth User (Added role and status)
         const userRecord = await pb.collection('users').create({
             email: shadowEmail,
             password: password,
             passwordConfirm: password,
-            name: name || "Student"
+            name: name || "Student",
+            role: 'student',
+            status: 'pending' // Students must also be approved or PB auth rules will block them
         });
 
         const teams = appStore.get('teams') || [{ id: 'eagle' }];
@@ -208,10 +220,6 @@ export const authManager = {
             throw new Error("Profile not found. Please register first.");
         }
 
-        if (studentProfile.status === 'pending') {
-            throw new Error("Account pending. Please wait for your professor to approve you.");
-        }
-
         const shadowEmail = studentProfile.shadowEmail;
         let authData;
 
@@ -219,7 +227,7 @@ export const authManager = {
             authData = await pb.collection('users').authWithPassword(shadowEmail, password);
         } catch (error) {
             console.error("Login failed:", error);
-            throw new Error("Incorrect password. Please try again.");
+            throw new Error("Account pending approval or incorrect password.");
         }
 
         const teams = appStore.get('teams') || [{ id: 'eagle' }];

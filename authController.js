@@ -4,13 +4,8 @@
 import { appStore, DEFAULT_AVATAR } from './store.js';
 import { authManager, pb } from './auth.js';
 
-// Extracted so the placeholder-avatar SVG isn't defined twice (it was
-// duplicated verbatim in the class property and again inside
-// showStudentAuth()). One constant, one place to change it.
 const DEFAULT_AVATAR_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
-// Extracted so the same querySelectorAll+forEach block isn't duplicated
-// between handleAvatarUpload() and showStudentAuth().
 function applyAvatarPreview(dataUrl) {
     const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
     previewImgs.forEach(img => { if (img) img.src = dataUrl; });
@@ -54,10 +49,6 @@ export const authUI = {
     },
 
     compressImageToSquare(file, callback) {
-        // 🔥 FIX: no validation that the selected file is actually an
-        // image. Previously, picking a PDF or any non-image file would
-        // silently read as a data URL, fail to load into an <Image>, and
-        // just leave the old preview showing with zero feedback.
         if (!file.type || !file.type.startsWith('image/')) {
             if (window.toast) window.toast("Please choose an image file.", false);
             return;
@@ -65,9 +56,6 @@ export const authUI = {
 
         const reader = new FileReader();
 
-        // 🔥 FIX: neither the FileReader nor the Image had an error
-        // handler. A corrupted file or unsupported image format would
-        // just hang silently with no callback ever firing.
         reader.onerror = () => {
             console.error("FileReader failed to read avatar image.");
             if (window.toast) window.toast("Couldn't read that image file. Please try another.", false);
@@ -93,12 +81,6 @@ export const authUI = {
                 canvas.height = MAX_SIZE;
                 const ctx = canvas.getContext('2d');
 
-                // 🔥 FIX: output is JPEG, which has no alpha channel.
-                // Drawing a transparent PNG straight onto the canvas and
-                // exporting as JPEG previously left transparent pixels as
-                // solid BLACK. Filling white first makes transparent
-                // source images (a common case for uploaded avatars) look
-                // correct instead of getting a black halo/background.
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, MAX_SIZE, MAX_SIZE);
 
@@ -162,7 +144,7 @@ export const authUI = {
 
             if (this.isProfRegistering) {
                 await authManager.registerProfessor(inputEmail, inputPass, inputName);
-                if (window.toast) window.toast("Registration sent to Management for approval!", true);
+                if (window.toast) window.toast("Registration sent! Please wait for management approval before logging in.", true);
                 this.toggleProfAuthMode();
             } else {
                 await authManager.loginProfessor(inputEmail, inputPass);
@@ -181,7 +163,8 @@ export const authUI = {
                 }
             }
         } catch (error) {
-            if (window.toast) window.toast(`Auth Failed: ${error.message}`, false);
+            // Updated to handle PocketBase API Auth rejection seamlessly
+            if (window.toast) window.toast(error.message, false);
         } finally {
             if (authBtn) {
                 authBtn.innerText = this.isProfRegistering ? "Register & Request Approval" : "Login";
@@ -253,11 +236,6 @@ export const authUI = {
         try {
             if (!cc) throw new Error("Please select a Country Code.");
             if (!phone) throw new Error("Please enter your Phone Number.");
-            // 🔥 FIX: was `phone.length < 6`, but auth.js's registerStudent /
-            // loginStudent both require 8-15 digits via regex. A 6 or
-            // 7-digit number passed this check, only to fail moments later
-            // in auth.js with a different error message — a confusing
-            // two-stage validation mismatch. Aligned to the same minimum.
             if (phone.length < 8) throw new Error("Please enter a valid Phone Number.");
 
             if (authBtn) {
@@ -280,16 +258,6 @@ export const authUI = {
                 if (window.toast) window.toast("Login successful!", true);
 
                 if (window.syncManager) {
-                    // 🔥 FIX: was `window.pb?.authStore?.model.id` — the
-                    // AUTH user id. Profile fields (avatar, coins, xp,
-                    // scores) live on the `players` collection record, not
-                    // on `users`, so mirroring against the auth id would
-                    // watch the wrong record. `me.playerId` (set in
-                    // auth.js's loginStudent) is the correct id.
-                    // NOTE: StateSyncController.js currently subscribes to
-                    // the `users` collection — it needs to be updated to
-                    // subscribe to `players` using this id for real-time
-                    // mirroring to actually reflect profile changes.
                     const me = appStore.get('me');
                     const playerId = me?.playerId || window.pb?.authStore?.model?.id;
                     if (playerId) {
@@ -364,15 +332,6 @@ document.addEventListener("DOMContentLoaded", () => {
 export async function handleCharacterSelection(userId, imageName) {
     try {
         if (!window.pb) throw new Error("PocketBase client not found.");
-
-        // 🔥 FIX: was `pb.collection('users').update(userId, { avatar:
-        // imageName })`. Per auth.js's schema, avatar lives on the
-        // `players` profile record, not on the `users` auth record — the
-        // `users` collection likely doesn't even have an `avatar` field.
-        // This would either throw (unknown field) or silently write to
-        // the wrong place, and the character-select screen would never
-        // actually persist. Look up the player's profile via its `user`
-        // relation and update THAT record.
         const playerRecord = await pb.collection('players').getFirstListItem(`user="${userId}"`);
         await pb.collection('players').update(playerRecord.id, { avatar: imageName || DEFAULT_AVATAR });
 
