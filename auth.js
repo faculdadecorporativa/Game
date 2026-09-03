@@ -1,14 +1,14 @@
 // auth.js
 // Multi-Tenant Logic Layer using PocketBase Database Isolation
 
-import { appStore } from './store.js';
+import { appStore, DEFAULT_AVATAR } from './store.js';
 
 // Initialize PocketBase instance and expose globally if needed
 export const pb = window.pb || new window.PocketBase('https://pb.faculdadecorporativa.com.br');
 window.pb = pb;
 
 const EMAIL_CONFIG = {
-    serviceID: 'service_zheujzk', 
+    serviceID: 'service_zheujzk',
     templateID: 'template_ovt15kk'
 };
 
@@ -17,7 +17,7 @@ export const authManager = {
     async getProfessors() {
         try {
             const records = await pb.collection('players').getFullList({
-                filter: 'role="professor"'
+                filter: 'role="professor" && status="approved"'
             });
             return records;
         } catch (err) {
@@ -39,18 +39,24 @@ export const authManager = {
         try {
             const record = await pb.collection('gamedata').getFirstListItem(`profId="${profId}" && node="${node}"`);
             return record.data || {};
-        } catch {
-            return {}; 
+        } catch (err) {
+            if (err?.status === 404) return {};
+            console.error(`getDB("${node}") failed:`, err);
+            throw err;
         }
     },
-    
+
     async saveDB(data, node) {
         const profId = appStore.get('currentProfId');
         if (!profId) throw new Error("Critical Error: No Professor ID isolated in state.");
         try {
             const record = await pb.collection('gamedata').getFirstListItem(`profId="${profId}" && node="${node}"`);
             await pb.collection('gamedata').update(record.id, { data });
-        } catch {
+        } catch (err) {
+            if (err?.status !== 404) {
+                console.error(`saveDB("${node}") failed:`, err);
+                throw err;
+            }
             await pb.collection('gamedata').create({ profId, node, data });
         }
     },
@@ -69,13 +75,21 @@ export const authManager = {
         });
 
         // 2. Create Professor Profile in 'players' collection
-        const profData = {
-            user: userRecord.id,
-            nickname: name,
-            role: 'professor',
-            status: 'pending'
-        };
-        await pb.collection('players').create(profData);
+        try {
+            const profData = {
+                user: userRecord.id,
+                nickname: name,
+                role: 'professor',
+                status: 'pending'
+            };
+            await pb.collection('players').create(profData);
+        } catch (profileErr) {
+            console.error("Failed to create professor profile, rolling back user record:", profileErr);
+            try { await pb.collection('users').delete(userRecord.id); } catch (cleanupErr) {
+                console.error("Rollback also failed — orphaned user record:", userRecord.id, cleanupErr);
+            }
+            throw new Error("Registration failed while creating your profile. Please try again.");
+        }
 
         // 3. Admin Notification via EmailJS
         if (typeof emailjs !== 'undefined') {
@@ -87,20 +101,20 @@ export const authManager = {
                     page_name: "E-Learning Platform",
                     action_link: adminLink
                 });
-            } catch (emailError) { 
-                console.error("❌ EmailJS failed:", emailError); 
+            } catch (emailError) {
+                console.error("❌ EmailJS failed:", emailError);
             }
         }
 
-        pb.authStore.clear(); 
+        pb.authStore.clear();
         return { user: userRecord };
     },
 
     async loginProfessor(email, password) {
         if (!email || !password) throw new Error("Email and password are required.");
-        
+
         const authData = await pb.collection('users').authWithPassword(email, password);
-        
+
         let profProfile;
         try {
             profProfile = await pb.collection('players').getFirstListItem(`user="${authData.record.id}"`);
@@ -116,7 +130,7 @@ export const authManager = {
 
         appStore.set('role', 'host');
         appStore.set('currentProfId', authData.record.id);
-        appStore.set('profName', profProfile.nickname); 
+        appStore.set('profName', profProfile.nickname);
         return authData;
     },
 
@@ -128,11 +142,19 @@ export const authManager = {
         }
         if (!profId) throw new Error("Please select a Professor.");
 
+        const phone = countryCode + cleanPhoneInput;
+
+        try {
+            await pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
+            throw new Error("An account with this phone number already exists for this professor. Please log in instead.");
+        } catch (err) {
+            if (err?.status !== 404) throw err; 
+        }
+
         appStore.set('currentProfId', profId);
 
-        const phone = countryCode + cleanPhoneInput;
         const shadowEmail = `${phone}_${Date.now()}@student.app.com`;
-        
+
         // 1. Create Shadow Auth User
         const userRecord = await pb.collection('users').create({
             email: shadowEmail,
@@ -140,25 +162,33 @@ export const authManager = {
             passwordConfirm: password,
             name: name || "Student"
         });
-        
+
         const teams = appStore.get('teams') || [{ id: 'eagle' }];
         const rTeam = teams[Math.floor(Math.random() * teams.length)].id;
         const finalName = name || "Student";
-        
+
         // 2. Save Student Profile
-        const studentData = { 
-            user: userRecord.id, 
-            nickname: finalName, 
-            avatar: avatar, 
-            team: rTeam, 
-            shadowEmail: shadowEmail,
-            phone: phone,
-            professorId: profId,
-            role: 'student',
-            status: 'pending' 
-        }; 
-        await pb.collection('players').create(studentData);
-        
+        try {
+            const studentData = {
+                user: userRecord.id,
+                nickname: finalName,
+                avatar: avatar || DEFAULT_AVATAR,
+                team: rTeam,
+                shadowEmail: shadowEmail,
+                phone: phone,
+                professorId: profId,
+                role: 'student',
+                status: 'pending'
+            };
+            await pb.collection('players').create(studentData);
+        } catch (profileErr) {
+            console.error("Failed to create student profile, rolling back user record:", profileErr);
+            try { await pb.collection('users').delete(userRecord.id); } catch (cleanupErr) {
+                console.error("Rollback also failed — orphaned user record:", userRecord.id, cleanupErr);
+            }
+            throw new Error("Registration failed while creating your profile. Please try again.");
+        }
+
         appStore.set('role', 'student');
         return { user: userRecord };
     },
@@ -170,18 +200,18 @@ export const authManager = {
 
         appStore.set('currentProfId', profId);
         const phone = countryCode + cleanPhoneInput;
-        
+
         let studentProfile;
         try {
             studentProfile = await pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
         } catch (err) {
             throw new Error("Profile not found. Please register first.");
         }
-        
+
         if (studentProfile.status === 'pending') {
             throw new Error("Account pending. Please wait for your professor to approve you.");
         }
-        
+
         const shadowEmail = studentProfile.shadowEmail;
         let authData;
 
@@ -191,18 +221,19 @@ export const authManager = {
             console.error("Login failed:", error);
             throw new Error("Incorrect password. Please try again.");
         }
-        
+
         const teams = appStore.get('teams') || [{ id: 'eagle' }];
-        
-        const newMe = { 
+
+        const newMe = {
             uid: authData.record.id,
-            phone: phone, 
-            name: studentProfile.nickname, 
-            avatar: studentProfile.avatar, 
-            team: studentProfile.team || teams[0].id, 
-            border: studentProfile.border || 'border-slate-300', 
-            scores: studentProfile.scores || { total: 0, Speaking: 0, Writing: 0, Listening: 0, General: 0 }, 
-            lifelines: studentProfile.lifelines || { fiftyFifty: true, askProf: true, google: true, callFriend: true, freezeTime: true, timeBurn: true }, 
+            playerId: studentProfile.id,
+            phone: phone,
+            name: studentProfile.nickname,
+            avatar: studentProfile.avatar || DEFAULT_AVATAR,
+            team: studentProfile.team || teams[0].id,
+            border: studentProfile.border || 'border-slate-300',
+            scores: studentProfile.scores || { total: 0, Speaking: 0, Writing: 0, Listening: 0, General: 0 },
+            lifelines: studentProfile.lifelines || { fiftyFifty: true, askProf: true, google: true, callFriend: true, freezeTime: true, timeBurn: true },
             streak: studentProfile.streak || 0,
             maxStreak: studentProfile.maxStreak || 0,
             xp: studentProfile.xp || 0,
@@ -210,10 +241,13 @@ export const authManager = {
             inventory: studentProfile.inventory || {},
             equipped: studentProfile.equipped || { title: 'Novice Learner', border: 'border-slate-300' }
         };
-        
+
         appStore.set('me', newMe);
         appStore.set('role', 'student');
         
+        // Inject playerId into authData for precise synchronization in authController.js
+        authData.record.playerId = studentProfile.id;
+
         return authData;
     },
 
@@ -221,10 +255,10 @@ export const authManager = {
         const cleanPhoneInput = String(phoneInput).replace(/\D/g, '');
         if (!/^\d{8,15}$/.test(cleanPhoneInput)) throw new Error("Enter a valid numeric phone number.");
         if (!profId) throw new Error("Select your professor first.");
-        
+
         appStore.set('currentProfId', profId);
         const phone = countryCode + cleanPhoneInput;
-        
+
         let studentProfile;
         try {
             studentProfile = await pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
@@ -234,6 +268,6 @@ export const authManager = {
 
         const shadowEmail = studentProfile.shadowEmail;
         await pb.collection('users').requestPasswordReset(shadowEmail);
-        return shadowEmail; 
+        return shadowEmail;
     }
 };

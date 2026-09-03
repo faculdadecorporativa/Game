@@ -1,13 +1,25 @@
 // authController.js
 // Gatekeeper UI Controller (PocketBase Integrated)
 
-import { appStore } from './store.js';
-import { authManager } from './auth.js';
+import { appStore, DEFAULT_AVATAR } from './store.js';
+import { authManager, pb } from './auth.js';
+
+// Extracted so the placeholder-avatar SVG isn't defined twice (it was
+// duplicated verbatim in the class property and again inside
+// showStudentAuth()). One constant, one place to change it.
+const DEFAULT_AVATAR_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+
+// Extracted so the same querySelectorAll+forEach block isn't duplicated
+// between handleAvatarUpload() and showStudentAuth().
+function applyAvatarPreview(dataUrl) {
+    const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
+    previewImgs.forEach(img => { if (img) img.src = dataUrl; });
+}
 
 export const authUI = {
     isProfRegistering: false,
     isRegistering: false,
-    tempAvatar: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E",
+    tempAvatar: DEFAULT_AVATAR_SVG,
 
     toggleVisibility(inputId) {
         const input = document.getElementById(inputId);
@@ -15,7 +27,7 @@ export const authUI = {
             input.type = input.type === 'password' ? 'text' : 'password';
         }
     },
-    
+
     async loadProfessorsDropdown() {
         const selectEl = document.getElementById('professor-select');
         if (!selectEl) return;
@@ -24,12 +36,12 @@ export const authUI = {
 
         try {
             const professors = await authManager.getProfessors();
-            
+
             if (professors && professors.length > 0) {
                 professors.forEach(prof => {
                     const option = document.createElement('option');
                     option.value = prof.user || prof.id;
-                    option.textContent = prof.nickname || prof.name || "Professor";
+                    option.textContent = prof.nickname || "Professor";
                     selectEl.appendChild(option);
                 });
             } else {
@@ -42,13 +54,37 @@ export const authUI = {
     },
 
     compressImageToSquare(file, callback) {
+        // 🔥 FIX: no validation that the selected file is actually an
+        // image. Previously, picking a PDF or any non-image file would
+        // silently read as a data URL, fail to load into an <Image>, and
+        // just leave the old preview showing with zero feedback.
+        if (!file.type || !file.type.startsWith('image/')) {
+            if (window.toast) window.toast("Please choose an image file.", false);
+            return;
+        }
+
         const reader = new FileReader();
+
+        // 🔥 FIX: neither the FileReader nor the Image had an error
+        // handler. A corrupted file or unsupported image format would
+        // just hang silently with no callback ever firing.
+        reader.onerror = () => {
+            console.error("FileReader failed to read avatar image.");
+            if (window.toast) window.toast("Couldn't read that image file. Please try another.", false);
+        };
+
         reader.onload = (e) => {
             const img = new Image();
+
+            img.onerror = () => {
+                console.error("Failed to decode avatar image.");
+                if (window.toast) window.toast("That image couldn't be loaded. Please try another.", false);
+            };
+
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_SIZE = 150; 
-                
+                const MAX_SIZE = 150;
+
                 const size = Math.min(img.width, img.height);
                 const startX = (img.width - size) / 2;
                 const startY = (img.height - size) / 2;
@@ -56,7 +92,16 @@ export const authUI = {
                 canvas.width = MAX_SIZE;
                 canvas.height = MAX_SIZE;
                 const ctx = canvas.getContext('2d');
-                
+
+                // 🔥 FIX: output is JPEG, which has no alpha channel.
+                // Drawing a transparent PNG straight onto the canvas and
+                // exporting as JPEG previously left transparent pixels as
+                // solid BLACK. Filling white first makes transparent
+                // source images (a common case for uploaded avatars) look
+                // correct instead of getting a black halo/background.
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, MAX_SIZE, MAX_SIZE);
+
                 ctx.drawImage(img, startX, startY, size, size, 0, 0, MAX_SIZE, MAX_SIZE);
                 callback(canvas.toDataURL('image/jpeg', 0.8));
             };
@@ -69,21 +114,17 @@ export const authUI = {
         const f = e.target.files[0];
         if (f) {
             this.compressImageToSquare(f, (compressedData) => {
-                this.tempAvatar = compressedData; 
-                
-                const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
-                previewImgs.forEach(img => {
-                    if (img) img.src = compressedData;
-                });
+                this.tempAvatar = compressedData;
+                applyAvatarPreview(compressedData);
             });
         }
     },
 
-    showProfLogin() { 
+    showProfLogin() {
         this.isProfRegistering = false;
         this.updateProfAuthUI();
-        if (window.uiManager) window.uiManager.closeModals(); 
-        document.getElementById('modal-prof-login')?.classList.remove('hidden'); 
+        if (window.uiManager) window.uiManager.closeModals();
+        document.getElementById('modal-prof-login')?.classList.remove('hidden');
     },
 
     toggleProfAuthMode() {
@@ -104,14 +145,14 @@ export const authUI = {
         if (regFields) regFields.classList.toggle('hidden', !this.isProfRegistering);
         if (forgotBtn) forgotBtn.classList.toggle('hidden', this.isProfRegistering);
     },
-    
+
     async submitProfAuth() {
         const inputEmail = document.getElementById('prof-email')?.value.trim();
         const inputPass = document.getElementById('prof-pass')?.value.trim();
         const nameEl = document.getElementById('prof-name');
         const inputName = nameEl ? nameEl.value.trim() : '';
         const authBtn = document.getElementById('p-auth-btn');
-        
+
         try {
             if (authBtn) {
                 authBtn.innerText = "Authenticating...";
@@ -120,34 +161,23 @@ export const authUI = {
             }
 
             if (this.isProfRegistering) {
-                // Register via PocketBase (default role: 'professor', approved: false)
                 await authManager.registerProfessor(inputEmail, inputPass, inputName);
                 if (window.toast) window.toast("Registration sent to Management for approval!", true);
                 this.toggleProfAuthMode();
             } else {
-                // Log in via PocketBase
                 await authManager.loginProfessor(inputEmail, inputPass);
-                
-                // PocketBase Approval Verification Check
-                const user = window.pb?.authStore?.record || window.pb?.authStore?.model;
-                if (user && user.role === 'professor' && !user.approved) {
-                    // Revoke local token/session immediately if pending approval
-                    if (window.pb?.authStore) window.pb.authStore.clear();
-                    throw new Error("Your account is pending approval by Management.");
-                }
-
                 if (window.toast) window.toast("Professor authenticated securely.", true);
-                
+
                 if (window.databaseJanitor) {
                     window.databaseJanitor.runCleanup();
                 }
-                
-                if (window.uiManager) window.uiManager.closeModals(); 
+
+                if (window.uiManager) window.uiManager.closeModals();
                 const mod0 = document.getElementById('module-0');
-                if (mod0) mod0.classList.add('hidden'); 
-                
+                if (mod0) mod0.classList.add('hidden');
+
                 if (window.app && window.app.hostGame) {
-                    await window.app.hostGame(); 
+                    await window.app.hostGame();
                 }
             }
         } catch (error) {
@@ -163,7 +193,7 @@ export const authUI = {
 
     async resetProfPassword() {
         const email = document.getElementById('prof-email')?.value.trim();
-        
+
         if (!email) {
             if (window.toast) window.toast("Please enter your email address in the top box first to reset your password.", false);
             if (window.sfx) window.sfx.play('wrong');
@@ -180,25 +210,23 @@ export const authUI = {
         }
     },
 
-    showStudentAuth() { 
+    showStudentAuth() {
         this.isRegistering = false;
-        this.tempAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-        
-        const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
-        previewImgs.forEach(img => { if (img) img.src = this.tempAvatar; });
+        this.tempAvatar = DEFAULT_AVATAR_SVG;
+        applyAvatarPreview(this.tempAvatar);
 
-        this.updateAuthUI(); 
-        if (window.uiManager) window.uiManager.closeModals(); 
-        document.getElementById('modal-student-auth')?.classList.remove('hidden'); 
-        
+        this.updateAuthUI();
+        if (window.uiManager) window.uiManager.closeModals();
+        document.getElementById('modal-student-auth')?.classList.remove('hidden');
+
         this.loadProfessorsDropdown();
     },
-    
-    toggleAuthMode() { 
-        this.isRegistering = !this.isRegistering; 
-        this.updateAuthUI(); 
+
+    toggleAuthMode() {
+        this.isRegistering = !this.isRegistering;
+        this.updateAuthUI();
     },
-    
+
     updateAuthUI() {
         const titleEl = document.getElementById('s-auth-title');
         const btnEl = document.getElementById('s-auth-btn');
@@ -214,18 +242,23 @@ export const authUI = {
     async submitStudentAuth() {
         const cc = document.getElementById('s-cc')?.value;
         const rawPhone = document.getElementById('s-phone')?.value || '';
-        const phone = rawPhone.replace(/\D/g, ''); 
+        const phone = rawPhone.replace(/\D/g, '');
         const pass = document.getElementById('s-pass')?.value.trim();
         const nameEl = document.getElementById('s-name');
         const name = nameEl ? nameEl.value.trim() : '';
         const profSelect = document.getElementById('professor-select');
         const profId = profSelect ? profSelect.value : null;
         const authBtn = document.getElementById('s-auth-btn');
-        
+
         try {
             if (!cc) throw new Error("Please select a Country Code.");
             if (!phone) throw new Error("Please enter your Phone Number.");
-            if (phone.length < 6) throw new Error("Please enter a valid Phone Number.");
+            // 🔥 FIX: was `phone.length < 6`, but auth.js's registerStudent /
+            // loginStudent both require 8-15 digits via regex. A 6 or
+            // 7-digit number passed this check, only to fail moments later
+            // in auth.js with a different error message — a confusing
+            // two-stage validation mismatch. Aligned to the same minimum.
+            if (phone.length < 8) throw new Error("Please enter a valid Phone Number.");
 
             if (authBtn) {
                 authBtn.innerText = "Authenticating...";
@@ -235,21 +268,32 @@ export const authUI = {
 
             if (this.isRegistering) {
                 if (!profId) throw new Error("Please select a Professor.");
-                
+
                 await authManager.registerStudent(cc, phone, pass, name, this.tempAvatar, profId);
-                
+
                 if (window.toast) window.toast(`Account registered! Waiting for professor approval.`, true);
                 if (window.uiManager) window.uiManager.closeModals();
-                return; 
-                
+                return;
+
             } else {
                 await authManager.loginStudent(cc, phone, pass, profId);
                 if (window.toast) window.toast("Login successful!", true);
-                
+
                 if (window.syncManager) {
-                    const currentUser = window.pb?.authStore?.record || window.pb?.authStore?.model;
-                    if (currentUser) {
-                        window.syncManager.startMirroring(currentUser.id);
+                    // 🔥 FIX: was `window.pb?.authStore?.model.id` — the
+                    // AUTH user id. Profile fields (avatar, coins, xp,
+                    // scores) live on the `players` collection record, not
+                    // on `users`, so mirroring against the auth id would
+                    // watch the wrong record. `me.playerId` (set in
+                    // auth.js's loginStudent) is the correct id.
+                    // NOTE: StateSyncController.js currently subscribes to
+                    // the `users` collection — it needs to be updated to
+                    // subscribe to `players` using this id for real-time
+                    // mirroring to actually reflect profile changes.
+                    const me = appStore.get('me');
+                    const playerId = me?.playerId || window.pb?.authStore?.model?.id;
+                    if (playerId) {
+                        window.syncManager.startMirroring(playerId);
                     }
                 }
             }
@@ -257,12 +301,12 @@ export const authUI = {
             if (window.sfx && window.sfx.play) window.sfx.play('alert');
             if (window.startConfetti) window.startConfetti();
 
-            setTimeout(() => { 
+            setTimeout(() => {
                 if (window.uiManager) {
-                    window.uiManager.closeModals(); 
-                    window.uiManager.hideAll(); 
+                    window.uiManager.closeModals();
+                    window.uiManager.hideAll();
                 }
-                
+
                 const joinPinMod = document.getElementById('module-join-pin');
                 if (joinPinMod) {
                     joinPinMod.classList.remove('hidden');
@@ -283,12 +327,12 @@ export const authUI = {
     },
 
     showRecovery() {
-        if (window.uiManager) window.uiManager.closeModals(); 
-        document.getElementById('modal-recovery')?.classList.remove('hidden'); 
+        if (window.uiManager) window.uiManager.closeModals();
+        document.getElementById('modal-recovery')?.classList.remove('hidden');
     },
 
     sendCode() {
-        if (window.uiManager) window.uiManager.closeModals(); 
+        if (window.uiManager) window.uiManager.closeModals();
         if (window.sfx) window.sfx.play('alert');
         if (window.toast) window.toast("🔒 For security, please ask your Professor to instantly reset your password from their Control Center.", false);
     },
@@ -321,11 +365,20 @@ export async function handleCharacterSelection(userId, imageName) {
     try {
         if (!window.pb) throw new Error("PocketBase client not found.");
 
-        await window.pb.collection('users').update(userId, { avatar: imageName });
+        // 🔥 FIX: was `pb.collection('users').update(userId, { avatar:
+        // imageName })`. Per auth.js's schema, avatar lives on the
+        // `players` profile record, not on the `users` auth record — the
+        // `users` collection likely doesn't even have an `avatar` field.
+        // This would either throw (unknown field) or silently write to
+        // the wrong place, and the character-select screen would never
+        // actually persist. Look up the player's profile via its `user`
+        // relation and update THAT record.
+        const playerRecord = await pb.collection('players').getFirstListItem(`user="${userId}"`);
+        await pb.collection('players').update(playerRecord.id, { avatar: imageName || DEFAULT_AVATAR });
 
         let me = appStore.get('me');
         if (me) {
-            me.avatar = imageName;
+            me.avatar = imageName || DEFAULT_AVATAR;
             appStore.set('me', me);
         }
 
