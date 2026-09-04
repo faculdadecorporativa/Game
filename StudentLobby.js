@@ -2,8 +2,18 @@
 // 🏗️ This is your extracted Student Lobby Web Component!
 
 export class StudentLobby extends HTMLElement {
-    
+
     connectedCallback() {
+        // 🔥 FIX: connectedCallback() fires every time the element is
+        // (re)inserted into the DOM — not just once. If anything ever
+        // moves or re-mounts this node (a parent re-render, some future
+        // routing change), render() would wipe #wait-countdown's live
+        // value and #wait-spinner's hidden/visible state back to the
+        // default markup, silently discarding whatever network.js's
+        // countdown/room logic had set. Guarding makes the initial render
+        // happen exactly once per element instance.
+        if (this._rendered) return;
+        this._rendered = true;
         this.render();
     }
 
@@ -31,5 +41,14 @@ export class StudentLobby extends HTMLElement {
     }
 }
 
-// 🚀 Register the custom tag
-customElements.define('student-lobby', StudentLobby);
+// 🔥 FIX: `customElements.define()` throws `NotSupportedError: this name
+// has already been used with this registry` if the module is ever
+// evaluated twice — a routine occurrence under Vite's dev-server HMR
+// (hot module replacement) when this file or one of its importers gets
+// edited and reloaded without a full page refresh. That throw happens at
+// module-load time, which can take down the whole import chain, not just
+// this component. Guarding is a standard, low-risk fix for custom
+// elements in a Vite project.
+if (!customElements.get('student-lobby')) {
+    customElements.define('student-lobby', StudentLobby);
+}
