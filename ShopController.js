@@ -34,17 +34,50 @@ export const shopController = {
     },
 
     openShop() {
+        const shopMod = document.getElementById('module-shop');
+        if (!shopMod) {
+            console.error("Shop module not found in the DOM.");
+            return;
+        }
+
+        // 1. Manually hide all other active modules to prevent overlap and bypass uiManager errors[cite: 14]
+        const activeModules = document.querySelectorAll('main > *:not(.hidden)');
+        activeModules.forEach(mod => {
+            if (mod.id !== 'module-shop' && mod.id !== 'lifelines-panel') {
+                mod.classList.add('hidden');
+                mod.classList.remove('fade-in');
+            }
+        });
+
+        // 2. Unhide the Shop Module and apply the animation[cite: 14]
+        shopMod.classList.remove('hidden');
+        shopMod.classList.add('fade-in');
+
+        // 3. Update the coins display safely[cite: 14]
         const me = appStore.get('me');
         const shopCoinsEl = document.getElementById('shop-coins');
-        if(me && shopCoinsEl) shopCoinsEl.innerText = me.coins || 0;
+        if (me && shopCoinsEl) {
+            shopCoinsEl.innerText = me.coins || 0;
+        }
         
-        if (window.uiManager) window.uiManager.hideAll();
-        if (window.sfx) window.sfx.play('alert'); 
+        if (window.sfx && window.sfx.play) window.sfx.play('alert'); 
         
-        const shopMod = document.getElementById('module-shop');
-        if (shopMod) shopMod.classList.remove('hidden');
-
         this.switchTab('consumables'); 
+    },
+
+    closeShop() {
+        const shopMod = document.getElementById('module-shop');
+        if (shopMod) {
+            shopMod.classList.add('hidden');
+            shopMod.classList.remove('fade-in');
+        }
+        
+        // Return the user safely back to their dashboard
+        const dashboard = document.getElementById('module-dashboard');
+        if (dashboard) {
+            dashboard.classList.remove('hidden');
+            dashboard.classList.add('fade-in');
+        }
     },
 
     switchTab(tabId) {
