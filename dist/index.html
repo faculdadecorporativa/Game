@@ -78,10 +78,10 @@
             confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, zIndex: 99999 });
         };
     </script>
-  <script type="module" crossorigin src="/assets/index-C4AENz1l.js"></script>
+  <script type="module" crossorigin src="/assets/index-BOX7Hjnl.js"></script>
 </head>
 
-<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white relative overflow-x-hidden pb-12 transition-colors duration-300">
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 h-screen w-screen overflow-hidden font-sans antialiased selection:bg-indigo-500 selection:text-white relative transition-colors duration-300">
     
     <div class="hidden dark:block fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
     <div class="hidden dark:block fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
@@ -105,7 +105,7 @@
 
     <app-header class="relative z-20"></app-header>
 
-    <main class="w-full max-w-[1920px] mx-auto px-2 sm:px-6 py-8 relative z-10 transition-all duration-300">
+    <main class="w-full max-w-[1920px] h-[calc(100vh-80px)] overflow-y-auto mx-auto px-2 sm:px-6 py-2 relative z-10 transition-all duration-300">
         
         <role-selection id="module-0"></role-selection>
         <module-join-pin id="module-join-pin" class="hidden fade-in w-full block mt-20"></module-join-pin>
@@ -114,7 +114,7 @@
 
         <!-- Dynamic Game Modules -->
         <student-dashboard id="module-dashboard" class="hidden fade-in w-full block mt-20"></student-dashboard>
-        <gamified-shop id="module-shop" class="hidden fade-in w-full block mt-10 mb-20"></gamified-shop>
+        <gamified-shop id="module-shop" class="hidden fade-in w-full block h-full"></gamified-shop>
 
         <div id="lifelines-panel" class="hidden max-w-3xl mx-auto mb-6 bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl border border-slate-200 dark:border-white/10 p-3 rounded-xl dark:rounded-2xl shadow-lg flex justify-center space-x-2 sm:space-x-4 relative z-10 transition-colors duration-300">
             <button onclick="window.lifelineManager.use('fiftyFifty')" id="ll-fiftyFifty" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-lg sm:text-xl font-black text-indigo-600 dark:text-white">50/50</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Half Off</span></button>
