@@ -2,18 +2,9 @@
 // Handles visual updates (Heavily Stylized with Glassmorphism)
 
 import { tailwindColors, animalThemes } from './data.js';
-import { appStore, getAvatarUrl } from './store.js';
+import { appStore, DEFAULT_AVATAR } from './store.js';
 
-// 🔥 FIX: every avatar <img> in this file was doing `src="${p.avatar}"` —
-// but per the app's schema, `avatar` is a bare filename ("king-david.png"),
-// not a path. Rendering it raw means the browser requests a 404 relative
-// to the current page URL instead of `/public/avatars/king-david.png`.
-// getAvatarUrl() (from store.js) builds the correct path AND falls back to
-// a default filename when avatar is missing/empty. Paired with this
-// onerror handler, a bad/deleted avatar file also degrades gracefully
-// instead of showing a broken image icon. `this.onerror=null` prevents an
-// infinite loop if the default avatar itself 404s.
-const AVATAR_ONERROR = `this.onerror=null;this.src='${getAvatarUrl(null)}';`;
+const AVATAR_ONERROR = `this.onerror=null;this.src='${DEFAULT_AVATAR}';`;
 
 // Placeholder used for the professor HUD, which (unlike student avatars)
 // stores a data URI in localStorage rather than a server filename.
