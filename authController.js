@@ -1,20 +1,12 @@
 // authController.js
-// Gatekeeper UI Controller (PocketBase Integrated)
+// Gatekeeper UI Controller (PocketBase Integrated - NO PHOTO UPLOAD)
 
 import { appStore, DEFAULT_AVATAR } from './store.js';
 import { authManager, pb } from './auth.js';
 
-const DEFAULT_AVATAR_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-
-function applyAvatarPreview(dataUrl) {
-    const previewImgs = document.querySelectorAll('#student-avatar-preview, .modal-avatar-preview');
-    previewImgs.forEach(img => { if (img) img.src = dataUrl; });
-}
-
 export const authUI = {
     isProfRegistering: false,
     isRegistering: false,
-    tempAvatar: DEFAULT_AVATAR_SVG,
 
     toggleVisibility(inputId) {
         const input = document.getElementById(inputId);
@@ -45,60 +37,6 @@ export const authUI = {
         } catch (error) {
             console.error("Error loading professors:", error);
             selectEl.innerHTML += '<option value="" disabled>Error loading list.</option>';
-        }
-    },
-
-    compressImageToSquare(file, callback) {
-        if (!file.type || !file.type.startsWith('image/')) {
-            if (window.toast) window.toast("Please choose an image file.", false);
-            return;
-        }
-
-        const reader = new FileReader();
-
-        reader.onerror = () => {
-            console.error("FileReader failed to read avatar image.");
-            if (window.toast) window.toast("Couldn't read that image file. Please try another.", false);
-        };
-
-        reader.onload = (e) => {
-            const img = new Image();
-
-            img.onerror = () => {
-                console.error("Failed to decode avatar image.");
-                if (window.toast) window.toast("That image couldn't be loaded. Please try another.", false);
-            };
-
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_SIZE = 150;
-
-                const size = Math.min(img.width, img.height);
-                const startX = (img.width - size) / 2;
-                const startY = (img.height - size) / 2;
-
-                canvas.width = MAX_SIZE;
-                canvas.height = MAX_SIZE;
-                const ctx = canvas.getContext('2d');
-
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, MAX_SIZE, MAX_SIZE);
-
-                ctx.drawImage(img, startX, startY, size, size, 0, 0, MAX_SIZE, MAX_SIZE);
-                callback(canvas.toDataURL('image/jpeg', 0.8));
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    },
-
-    handleAvatarUpload(e) {
-        const f = e.target.files[0];
-        if (f) {
-            this.compressImageToSquare(f, (compressedData) => {
-                this.tempAvatar = compressedData;
-                applyAvatarPreview(compressedData);
-            });
         }
     },
 
@@ -163,7 +101,6 @@ export const authUI = {
                 }
             }
         } catch (error) {
-            // Updated to handle PocketBase API Auth rejection seamlessly
             if (window.toast) window.toast(error.message, false);
         } finally {
             if (authBtn) {
@@ -195,13 +132,9 @@ export const authUI = {
 
     showStudentAuth() {
         this.isRegistering = false;
-        this.tempAvatar = DEFAULT_AVATAR_SVG;
-        applyAvatarPreview(this.tempAvatar);
-
         this.updateAuthUI();
         if (window.uiManager) window.uiManager.closeModals();
         document.getElementById('modal-student-auth')?.classList.remove('hidden');
-
         this.loadProfessorsDropdown();
     },
 
@@ -246,8 +179,9 @@ export const authUI = {
 
             if (this.isRegistering) {
                 if (!profId) throw new Error("Please select a Professor.");
-
-                await authManager.registerStudent(cc, phone, pass, name, this.tempAvatar, profId);
+                
+                // Pass DEFAULT_AVATAR directly instead of an uploaded image
+                await authManager.registerStudent(cc, phone, pass, name, DEFAULT_AVATAR, profId);
 
                 if (window.toast) window.toast(`Account registered! Waiting for professor approval.`, true);
                 if (window.uiManager) window.uiManager.closeModals();
