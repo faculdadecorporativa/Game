@@ -1,5 +1,5 @@
 // AppHeader.js
-// 🏗️ Web Component for the App Header (Strict Dual-Mode Framework with Embedded Jitsi & Breakout Rooms)
+// 🏗️ Web Component for the App Header (Strict Dual-Mode Framework with Embedded Jitsi & Language Breakout Rooms)
 
 export class AppHeader extends HTMLElement {
     constructor() {
@@ -56,7 +56,7 @@ export class AppHeader extends HTMLElement {
                         
                         <button onclick="window.dashboardController.openDashboard()" id="btn-dashboard" class="flex items-center justify-center w-10 h-10 text-xl bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/40 border border-indigo-200 dark:border-indigo-500/30 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="My Dashboard">📊</button>
                         
-                        <!-- ADDED: Shop Button -->
+                        <!-- Shop Button -->
                         <button onclick="window.shopController.openShop()" id="btn-shop" class="flex items-center justify-center w-10 h-10 text-xl bg-amber-50 dark:bg-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/40 border border-amber-200 dark:border-amber-500/30 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="Avatar Shop">🛍️</button>
 
                         <!-- EMBEDDED JITSI MEET BUTTON -->
@@ -68,7 +68,7 @@ export class AppHeader extends HTMLElement {
                     <div class="flex items-center space-x-4 sm:space-x-6">
                         <div id="game-status" class="hidden flex items-center space-x-4 sm:space-x-6">
                             
-                            <!-- Global Timer mounts here and is styled by Utilities.js -->
+                            <!-- Global Timer mounts here -->
                             <div id="global-timer-container" class="hidden">
                                 <span id="global-timer">60</span><span id="global-timer-sec">s</span>
                             </div>
@@ -105,19 +105,19 @@ export class AppHeader extends HTMLElement {
                             </h3>
                         </div>
 
-                        <!-- Host Breakout Controls -->
+                        <!-- Language Breakout Controls -->
                         <div id="jitsi-breakout-controls" class="flex items-center gap-2 flex-wrap">
-                            <label class="text-xs font-semibold text-slate-600 dark:text-slate-300 hidden sm:inline">Breakout Rooms:</label>
+                            <label class="text-xs font-semibold text-slate-600 dark:text-slate-300 hidden sm:inline">Breakout Room:</label>
                             <select id="jitsi-room-count" class="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/10 focus:outline-none">
-                                <option value="2">2 Rooms (10 / room)</option>
-                                <option value="4" selected>4 Rooms (5 / room)</option>
-                                <option value="5">5 Rooms (4 / room)</option>
+                                <option value="English_Lalina">English - Lalina</option>
+                                <option value="Portuguese_Gabriela">Portuguese - Gabriela</option>
+                                <option value="Spanish_Ana">Spanish - Ana</option>
                             </select>
                             <button onclick="window.appHeader.divideBreakoutRooms()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95">
-                                🔀 Divide Class
+                                🔀 Switch Room
                             </button>
                             <button onclick="window.appHeader.returnToMainRoom()" class="bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95">
-                                🏠 Return All to Main
+                                🏠 Main Room
                             </button>
                         </div>
 
@@ -136,7 +136,7 @@ export class AppHeader extends HTMLElement {
         `;
     }
 
-    // Load Jitsi External API Script dynamically if not present
+    // Load Jitsi External API Script dynamically
     async loadJitsiScript() {
         if (window.JitsiMeetExternalAPI) return true;
         return new Promise((resolve, reject) => {
@@ -163,7 +163,10 @@ export class AppHeader extends HTMLElement {
 
             const roomTitle = this.querySelector('#jitsi-room-title');
             if (roomTitle) {
-                roomTitle.textContent = roomSuffix ? `Breakout Room: ${roomSuffix.replace('Room_', 'Room ')}` : 'Main Class Room';
+                const readableTitle = roomSuffix 
+                    ? roomSuffix.replace('_', ' - ') 
+                    : 'Main Class Room';
+                roomTitle.textContent = readableTitle;
             }
 
             const container = this.querySelector('#jitsi-iframe-container');
@@ -177,6 +180,12 @@ export class AppHeader extends HTMLElement {
                 parentNode: container,
                 interfaceConfigOverwrite: {
                     SHOW_JITSI_WATERMARK: false,
+                    SHOW_WATERMARK_FOR_GUESTS: false,
+                    SHOW_BRAND_WATERMARK: false,
+                    SHOW_POWERED_BY: false,
+                    DEFAULT_LOGO_URL: '',
+                    JITSI_WATERMARK_LINK: '',
+                    DISPLAY_WELCOME_PAGE_CONTENT: false,
                     TOOLBAR_BUTTONS: [
                         'microphone', 'camera', 'desktop', 'chat', 'raisehand',
                         'participants-pane', 'tileview', 'fullscreen', 'hangup'
@@ -185,7 +194,8 @@ export class AppHeader extends HTMLElement {
                 configOverwrite: {
                     startWithAudioMuted: true,
                     startWithVideoMuted: false,
-                    prejoinPageEnabled: false
+                    prejoinPageEnabled: false,
+                    hideConferenceSubject: false
                 }
             };
 
@@ -196,7 +206,7 @@ export class AppHeader extends HTMLElement {
             this.jitsiApi = new window.JitsiMeetExternalAPI(domain, options);
         } catch (err) {
             console.error('Failed to load Jitsi Meet:', err);
-            alert('Could not initialize video call. Check connection.');
+            alert('Could not initialize video call.');
         }
     }
 
@@ -211,59 +221,36 @@ export class AppHeader extends HTMLElement {
         }
     }
 
-    // Host Action: Divide participants into breakout rooms
+    // Switch into selected Language Breakout Room
     async divideBreakoutRooms() {
         const select = this.querySelector('#jitsi-room-count');
-        const numRooms = parseInt(select ? select.value : '4', 10);
+        const selectedRoom = select ? select.value : 'English_Lalina';
 
         try {
-            // Fetch connected players from PocketBase or local store
-            let players = [];
-            if (window.pb) {
-                players = await window.pb.collection('players').getFullList();
-            }
-
-            if (!players || players.length === 0) {
-                // Fallback demo distribution if no PB connected yet
-                alert(`Configured ${numRooms} breakout rooms! Directing users into Room 1 through Room ${numRooms}.`);
-                this.openJitsiModal('Room_1');
-                return;
-            }
-
-            // Round-robin distribution of players into rooms
-            for (let i = 0; i < players.length; i++) {
-                const roomIndex = (i % numRooms) + 1;
-                const assignedRoom = `Room_${roomIndex}`;
-
-                // Update PocketBase player record with assigned breakout room
-                await window.pb.collection('players').update(players[i].id, {
-                    current_room: assignedRoom
+            if (window.pb && window.pb.authStore.record) {
+                await window.pb.collection('players').update(window.pb.authStore.record.id, {
+                    current_room: selectedRoom
                 });
             }
-
-            alert(`Successfully assigned ${players.length} students across ${numRooms} breakout rooms!`);
-            this.openJitsiModal('Room_1');
-
+            this.openJitsiModal(selectedRoom);
         } catch (err) {
             console.error('Breakout room error:', err);
-            alert('Failed to update breakout room assignments.');
+            this.openJitsiModal(selectedRoom);
         }
     }
 
-    // Host Action: Pull all students back to main room
+    // Return back to Main Room
     async returnToMainRoom() {
         try {
-            if (window.pb) {
-                const players = await window.pb.collection('players').getFullList();
-                for (const player of players) {
-                    await window.pb.collection('players').update(player.id, {
-                        current_room: ''
-                    });
-                }
+            if (window.pb && window.pb.authStore.record) {
+                await window.pb.collection('players').update(window.pb.authStore.record.id, {
+                    current_room: ''
+                });
             }
             this.openJitsiModal();
         } catch (err) {
-            console.error('Error resetting rooms:', err);
+            console.error('Error resetting room:', err);
+            this.openJitsiModal();
         }
     }
 }
