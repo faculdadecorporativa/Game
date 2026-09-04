@@ -33,6 +33,35 @@ class Store {
 // Export the ultimate fallback avatar for new users
 export const DEFAULT_AVATAR = './public/avatars/king-david.png';
 
+/**
+ * Builds a valid image URL for avatars, supporting PocketBase records,
+ * absolute paths, data URIs, or local static avatar filenames.
+ */
+export function getAvatarUrl(avatar, fileName = null) {
+    if (!avatar) return DEFAULT_AVATAR;
+
+    // Handle PocketBase record object
+    if (typeof avatar === 'object') {
+        if (avatar.collectionId && avatar.id && fileName) {
+            return `https://pb.faculdadecorporativa.com.br/api/files/${avatar.collectionId}/${avatar.id}/${fileName}`;
+        }
+        if (avatar.avatar) {
+            return getAvatarUrl(avatar.avatar);
+        }
+        return DEFAULT_AVATAR;
+    }
+
+    // Handle string inputs (paths, URLs, or filenames)
+    if (typeof avatar === 'string') {
+        if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('data:') || avatar.startsWith('./') || avatar.startsWith('/')) {
+            return avatar;
+        }
+        return `./public/avatars/${avatar}`;
+    }
+
+    return DEFAULT_AVATAR;
+}
+
 // 4. Initialize the global store with Multi-Tenancy Room support
 export const appStore = new Store({
     role: null,             

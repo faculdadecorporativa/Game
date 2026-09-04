@@ -1,10 +1,8 @@
 // auth.js
-// Multi-Tenant Logic Layer using PocketBase Database Isolation
-
+import PocketBase from 'pocketbase';
 import { appStore, DEFAULT_AVATAR } from './store.js';
 
-// Initialize PocketBase instance and expose globally if needed
-export const pb = window.pb || new window.PocketBase('https://pb.faculdadecorporativa.com.br');
+export const pb = new PocketBase('https://pb.faculdadecorporativa.com.br');
 window.pb = pb;
 
 const EMAIL_CONFIG = {
