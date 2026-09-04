@@ -40,7 +40,7 @@ export const shopController = {
             return;
         }
 
-        // 1. Manually hide all other active modules to prevent overlap and bypass uiManager errors[cite: 14]
+        // 1. Manually hide all other active modules to prevent overlap
         const activeModules = document.querySelectorAll('main > *:not(.hidden)');
         activeModules.forEach(mod => {
             if (mod.id !== 'module-shop' && mod.id !== 'lifelines-panel') {
@@ -49,11 +49,11 @@ export const shopController = {
             }
         });
 
-        // 2. Unhide the Shop Module and apply the animation[cite: 14]
+        // 2. Unhide the Shop Module and apply the animation
         shopMod.classList.remove('hidden');
         shopMod.classList.add('fade-in');
 
-        // 3. Update the coins display safely[cite: 14]
+        // 3. Update the coins display safely
         const me = appStore.get('me');
         const shopCoinsEl = document.getElementById('shop-coins');
         if (me && shopCoinsEl) {

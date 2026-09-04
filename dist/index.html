@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Power of Feedback - Multiplayer RPG</title>
+    <title>Faculdade Corporativa - Multiplayer RPG</title>
     
     <!-- CDNs -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,6 +19,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pocketbase/dist/pocketbase.umd.js"></script>
+    <script type="module" src="./GamifiedShop.js"></script>
     <script type="text/javascript">
        (function(){
           emailjs.init({ publicKey: "XY0DjHoAeZqWKqnoV" });
@@ -85,7 +86,8 @@
     
     <div class="hidden dark:block fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
     <div class="hidden dark:block fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
-
+
+
 
     <div id="toast-container" class="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-[999999] flex flex-col gap-4 pointer-events-none"></div>
 
@@ -141,6 +143,7 @@
 
     <app-modals id="modal-overlay" class="relative z-50"></app-modals>
     <canvas id="confetti-canvas"></canvas>
-
+
+
 </body>
 </html>
