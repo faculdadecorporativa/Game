@@ -103,11 +103,6 @@ export class AppModals extends HTMLElement {
                     <div id="s-register-fields" class="hidden space-y-4 mb-6 border-t border-slate-300/50 dark:border-white/10 pt-4 transition-colors duration-300">
                         <p class="text-xs text-slate-600 dark:text-slate-400 font-bold uppercase tracking-widest text-center transition-colors duration-300">New Account Details</p>
                         <input type="text" id="s-name" class="w-full p-3 bg-slate-100 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-500/60 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 dark:text-white transition-colors duration-300" placeholder="Full Name">
-                        
-                        <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg border border-slate-300 dark:border-slate-500/50 transition-colors duration-300">
-                            <img id="student-avatar-preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" class="w-12 h-12 rounded-full border border-slate-300 dark:border-slate-500/60 object-cover bg-white dark:bg-slate-800 transition-colors duration-300">
-                            <input type="file" accept="image/*" class="w-full text-xs text-slate-600 dark:text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-indigo-100 dark:file:bg-indigo-500/20 file:text-indigo-700 dark:file:text-indigo-400 cursor-pointer transition-colors duration-300" onchange="window.authUI.handleAvatarUpload(event)">
-                        </div>
                     </div> 
                     
                     <div class="mb-4">
