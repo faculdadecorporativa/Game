@@ -14,7 +14,7 @@ export const authManager = {
     // --- FETCH APPROVED PROFESSORS ---
     async getProfessors() {
         try {
-            const records = await pb.collection('players').getFullList({
+            const records = await pb.collection('users').getFullList({
                 filter: 'role="professor" && status="approved"'
             });
             return records;
