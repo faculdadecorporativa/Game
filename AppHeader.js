@@ -50,6 +50,12 @@ export class AppHeader extends HTMLElement {
                         
                         <button onclick="window.dashboardController.openDashboard()" id="btn-dashboard" class="flex items-center justify-center w-10 h-10 text-xl bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/40 border border-indigo-200 dark:border-indigo-500/30 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="My Dashboard">📊</button>
                         
+                        <!-- ADDED: Shop Button -->
+                        <button onclick="window.shopController?.openShop()" id="btn-shop" class="flex items-center justify-center w-10 h-10 text-xl bg-amber-50 dark:bg-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/40 border border-amber-200 dark:border-amber-500/30 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="Avatar Shop">🛍️</button>
+
+                        <!-- ADDED: Jitsi Meet Button -->
+                        <button onclick="window.open('https://meet.jit.si/FaculdadeCorporativaClass', '_blank')" id="btn-meet" class="flex items-center justify-center w-10 h-10 text-xl bg-emerald-50 dark:bg-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/40 border border-emerald-200 dark:border-emerald-500/30 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="Join Class Meeting">📹</button>
+
                         <h1 class="text-xl font-bold tracking-tight hidden sm:block">E-Learning <span class="text-indigo-600 dark:text-indigo-400">Platform</span> <span id="room-code-display" class="ml-2 text-indigo-700 dark:text-white font-bold font-mono hidden transition-colors duration-300"></span></h1>
                     </div>
                     

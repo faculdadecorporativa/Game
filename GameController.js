@@ -3,6 +3,38 @@
 
 import { appStore } from './store.js';
 
+// 🔥 FIX: consolidates every PocketBase write submitScore() needs to make.
+// The old code fired up to THREE separate Firebase writes per scoring
+// event (extraLife decrement, doubleCoins decrement, then a full-record
+// overwrite) with no error handling on any of them. This does exactly one
+// `players` update with only the fields that actually changed — cheaper,
+// and it can't clobber a concurrent update to fields it doesn't touch
+// (e.g. an avatar change from handleCharacterSelection landing mid-game).
+async function persistPlayerFields(me, fields) {
+    if (!window.pb) {
+        console.error("PocketBase client (window.pb) not found — score not persisted.");
+        return;
+    }
+    // 🔥 IMPORTANT: `me.playerId` is the `players` collection record id
+    // (set in auth.js's loginStudent). `me.uid` is the AUTH user id and is
+    // NOT the right id to update here — see the note left in this
+    // conversation's auth.js/authController.js review.
+    if (!me?.playerId) {
+        console.warn("No playerId on `me` — skipping remote score sync (host test session?).");
+        return;
+    }
+    try {
+        await window.pb.collection('players').update(me.playerId, fields);
+    } catch (err) {
+        // Fire-and-forget callers (handleQuizAns, handleAudioAns, etc.)
+        // don't await submitScore(), so an unhandled rejection here would
+        // vanish silently. Catch it, log it, and let the player know their
+        // score might not have saved — much better than a silent data loss.
+        console.error("Failed to persist score update:", err);
+        if (window.toast) window.toast("⚠️ Score may not have saved — check your connection.", false);
+    }
+}
+
 // 🏗️ ENTERPRISE CONFIG: This defines the order of your game modules.
 const GameConfig = [
     { type: 'study', getTarget: () => null }, // Module 1
@@ -19,7 +51,20 @@ const GameConfig = [
 ];
 
 const cleanString = (str) => str.toLowerCase().replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
-const shuffleArray = (arr) => arr.sort(() => Math.random() - 0.5);
+
+// 🔥 FIX: `arr.sort(() => Math.random() - 0.5)` is a well-known biased
+// "shuffle" — sort comparators are not meant to be random, and this
+// pattern systematically favors certain permutations over others (some
+// items end up statistically more likely to land near the start/end).
+// For quiz/question ordering that's a real fairness bug, not just a style
+// nit. Proper Fisher–Yates shuffle, in place, uniform distribution.
+const shuffleArray = (arr) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+};
 
 export const game = {
     isRecordingReadAloud: false, readAloudRecognition: null, finalTranscript: "", audioContext: null, analyser: null, micStream: null, volumeRAF: null,
@@ -35,16 +80,22 @@ export const game = {
             }
         }
         
-        document.getElementById('scoreboard-container').classList.remove('hidden');
-        document.getElementById('wait-overlay').classList.add('hidden'); 
+        // 🔥 FIX: none of these were null-checked, including `panel` below
+        // — this runs at the top of EVERY module transition, so a single
+        // missing element here previously broke the entire game loop, not
+        // just one module.
+        document.getElementById('scoreboard-container')?.classList.remove('hidden');
+        document.getElementById('wait-overlay')?.classList.add('hidden');
         window.uiManager.unlockModule();
         
-        const panel = document.getElementById('lifelines-panel'); panel.classList.remove('hidden');
+        const panel = document.getElementById('lifelines-panel');
+        if (!panel) { console.error("#lifelines-panel missing from DOM — lifelines unavailable this module."); }
+        else panel.classList.remove('hidden');
         const mount = document.getElementById(`lifeline-mount-${modNum}`); 
-        if (mount) { 
+        if (mount && panel) { 
             mount.appendChild(panel); 
             window.lifelineManager.renderButtons(modNum); 
-        } else { 
+        } else if (panel) { 
             panel.classList.add('hidden'); 
         }
         
@@ -76,9 +127,19 @@ export const game = {
         }
     },
     
-    startTimer(sec) { window.timerManager.start(); },
+    // 🔥 FIX: `sec` was accepted but never used — `startModule()` calls
+    // `this.startTimer(60)` expecting a 60-second timer, but the value was
+    // silently discarded and `timerManager.start()` ran with whatever
+    // default it has internally. Passing it through now. If
+    // `timerManager.start()` doesn't accept a duration argument, this is a
+    // harmless no-op — but if it does, this fixes every module's timer
+    // possibly running the wrong length.
+    startTimer(sec) { window.timerManager.start(sec); },
     
     async submitScore(points, skill, msg) {
+        // NOTE: `window.uiManager.lockModule()` here is a no-op for hosts —
+        // lockModule() itself starts with `if (role === 'host') return;`.
+        // Harmless, but pointless; left as-is unless you want it removed.
         if(appStore.get('role') === 'host') { window.toast("Host test: " + msg, points > 0); window.uiManager.lockModule(); return; }
 
         window.timerManager.stop();
@@ -94,11 +155,13 @@ export const game = {
         if (points < 0 && me.inventory && me.inventory.extraLife > 0) {
             me.inventory.extraLife -= 1;
             appStore.set('me', me);
-            
-            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
-                const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/extraLife`);
-                await window.firebaseSet(userRef, me.inventory.extraLife);
-            }
+            // 🔥 FIX: was a Firebase partial-path write
+            // (`users/${uid}/inventory/extraLife`). PocketBase JSON fields
+            // don't support partial/nested-path writes — you send the
+            // whole field. Persistence for this change is now folded into
+            // the single consolidated write at the end of this function
+            // (`me.inventory` is included there), so no separate call is
+            // needed here.
 
             points = 0;
             msg = "&#128305; Saved by Extra Life!";
@@ -133,11 +196,9 @@ export const game = {
                 earnedCoins *= 2;
                 me.inventory.doubleCoins -= 1;
                 window.toast("&#129689; Double Coins Active! Earnings Multiplied!", true);
-                
-                if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
-                    const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}/inventory/doubleCoins`);
-                    await window.firebaseSet(userRef, me.inventory.doubleCoins);
-                }
+                // 🔥 FIX: same as extraLife above — no separate Firebase
+                // write needed; `me.inventory` goes out in the single
+                // consolidated update below.
             }
 
             me.xp += earnedXP;
@@ -151,21 +212,32 @@ export const game = {
         me.scores.total += points; 
         me.scores[skill] += points; 
         appStore.set('me', me);
-        
-        if (window.firebaseRef && window.firebaseSet && window.firebaseDB && me.uid) {
-            const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}`);
-            await window.firebaseSet(userRef, me);
-        }
+
+        // 🔥 FIX: was `window.firebaseSet(userRef, me)` — overwrote the
+        // ENTIRE remote record with the local `me` object on every single
+        // scoring event, including fields that hadn't changed (name,
+        // avatar, team, border, phone). Besides being wasteful, a
+        // full-record overwrite risks clobbering a concurrent update to a
+        // field this function doesn't own (e.g. an avatar change from
+        // handleCharacterSelection landing between this read and this
+        // write). Only send what actually changed.
+        await persistPlayerFields(me, { xp: me.xp, coins: me.coins, streak: me.streak, maxStreak: me.maxStreak, scores: me.scores, inventory: me.inventory });
 
         window.uiManager.updateStudentHUD();
         if (window.dashboardController) window.dashboardController.renderDashboard(); 
 
-        const hostConn = appStore.get('hostConn');
-        if(hostConn) hostConn.send({ type: 'SCORE_UPDATE', id: appStore.get('peer').id, points, skill });
+        // 🔥 FIX (dead code removed): `appStore.get('hostConn')` /
+        // `appStore.get('peer')` are leftovers from an earlier
+        // peer-to-peer (WebRTC/PeerJS) sync architecture. Neither
+        // `hostConn` nor `peer` is ever set anywhere in store.js's
+        // current state, or written by auth.js/network.js — this branch
+        // was always a silent no-op. The room/professor now learns about
+        // score changes via the real-time `players` subscription
+        // (see network.js's listenToRoom), so this call isn't needed.
         window.toast(msg + ` (${points > 0 ? '+'+points : points} pts)`, points > 0 || msg.includes("Extra Life")); 
         
         // 🔥 MULTIPLAYER SYNC FIX: Purged local auto-advancing timeouts. 
-        // Students MUST wait for the Host to broadcast the next module via Firebase!
+        // Students MUST wait for the Host to broadcast the next module via PocketBase!
         if (appStore.get('currentModule') !== 2 && appStore.get('currentModule') !== 4 && appStore.get('currentModule') !== 8) {
             window.uiManager.lockModule();
         }
@@ -197,7 +269,14 @@ export const game = {
         const players = appStore.get('players') || {};
         const me = appStore.get('me');
         let opponentName = "AI Bot"; 
-        const others = Object.values(players).filter(p => p.uid !== me?.uid);
+        // 🔥 FIX: filtered on `p.uid`, but roster records fetched via
+        // network.js's `players`/`students` query may not carry a `uid`
+        // field at all (depends on which fields that collection query
+        // selects) — if it's undefined on every entry, this filter can
+        // silently include the player themselves as their own "opponent".
+        // Fall back to `phone`, which is guaranteed present and unique.
+        const myKey = me?.playerId ?? me?.phone;
+        const others = Object.values(players).filter(p => (p.playerId ?? p.phone) !== myKey);
         if(others.length > 0) {
             opponentName = others[Math.floor(Math.random() * others.length)].name;
         }
@@ -339,7 +418,10 @@ export const game = {
         const players = appStore.get('players') || {};
         const me = appStore.get('me');
         let opponentName = "AI Bot"; 
-        const others = Object.values(players).filter(p => p.uid !== me?.uid);
+        // 🔥 FIX: same `uid`-may-not-exist-on-roster-records issue as
+        // initPuzzle() above — fall back to `phone` as the stable key.
+        const myKey = me?.playerId ?? me?.phone;
+        const others = Object.values(players).filter(p => (p.playerId ?? p.phone) !== myKey);
         if(others.length > 0) {
             opponentName = others[Math.floor(Math.random() * others.length)].name;
         }

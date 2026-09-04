@@ -2,7 +2,22 @@
 // Handles visual updates (Heavily Stylized with Glassmorphism)
 
 import { tailwindColors, animalThemes } from './data.js';
-import { appStore } from './store.js';
+import { appStore, getAvatarUrl } from './store.js';
+
+// 🔥 FIX: every avatar <img> in this file was doing `src="${p.avatar}"` —
+// but per the app's schema, `avatar` is a bare filename ("king-david.png"),
+// not a path. Rendering it raw means the browser requests a 404 relative
+// to the current page URL instead of `/public/avatars/king-david.png`.
+// getAvatarUrl() (from store.js) builds the correct path AND falls back to
+// a default filename when avatar is missing/empty. Paired with this
+// onerror handler, a bad/deleted avatar file also degrades gracefully
+// instead of showing a broken image icon. `this.onerror=null` prevents an
+// infinite loop if the default avatar itself 404s.
+const AVATAR_ONERROR = `this.onerror=null;this.src='${getAvatarUrl(null)}';`;
+
+// Placeholder used for the professor HUD, which (unlike student avatars)
+// stores a data URI in localStorage rather than a server filename.
+const DEFAULT_PROF_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
 function getRankEmoji(score, allPlayers) {
     const uniqueScores = [...new Set(allPlayers.map(p => p.score || p.scores?.total || 0))].sort((a, b) => b - a);
@@ -45,12 +60,17 @@ export const uiManager = {
         if (status) status.classList.remove('hidden');
         
         const profName = appStore.get('profName') || "Professor"; 
-        const savedAvatar = localStorage.getItem('profAvatar') || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        // Professor avatars are stored as data URIs in localStorage (from
+        // the character-upload flow), not filenames — getAvatarUrl()
+        // doesn't apply here. Already has a default via `||`; the onerror
+        // below adds a second layer of protection if that stored value is
+        // ever corrupted (e.g. truncated localStorage write).
+        const savedAvatar = localStorage.getItem('profAvatar') || DEFAULT_PROF_SVG;
 
         if (c) {
             c.innerHTML = `
                 <div id="prof-hud-container" class="flex items-center bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-lg rounded-full pr-5 p-1.5 transition-all">
-                    <img src="${savedAvatar}" alt="Prof" class="w-10 h-10 rounded-full border-2 border-indigo-400 mr-3 object-cover bg-slate-100 dark:bg-slate-900 shadow-inner">
+                    <img src="${savedAvatar}" alt="Prof" onerror="this.onerror=null;this.src='${DEFAULT_PROF_SVG}';" class="w-10 h-10 rounded-full border-2 border-indigo-400 mr-3 object-cover bg-slate-100 dark:bg-slate-900 shadow-inner">
                     <div class="flex flex-col leading-tight text-left">
                         <span class="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase tracking-widest font-black">Host</span>
                         <span class="text-sm font-bold text-slate-800 dark:text-white" id="prof-hud-name">${profName}</span>
@@ -69,7 +89,7 @@ export const uiManager = {
 
         c.innerHTML = `
         <div class="flex items-center bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-lg rounded-full pr-5 p-1.5 transition-all">
-            <img src="${me.avatar}" class="w-10 h-10 rounded-full border-2 ${me.border || 'border-slate-300'} object-cover bg-slate-100 dark:bg-slate-900 mr-3 shadow-inner">
+            <img src="${getAvatarUrl(me.avatar)}" onerror="${AVATAR_ONERROR}" class="w-10 h-10 rounded-full border-2 ${me.border || 'border-slate-300'} object-cover bg-slate-100 dark:bg-slate-900 mr-3 shadow-inner">
             <div class="flex flex-col leading-tight">
                 <span class="text-xs text-slate-800 dark:text-white font-black">${me.name} <span class="${tColorClass} ml-1 font-bold text-[10px] uppercase tracking-widest">[${myTheme.icon || ''} ${myTheme.name}]</span></span>
                 <span class="text-sm font-black text-amber-500 drop-shadow-sm">Score: ${me.scores?.total || 0}</span>
@@ -82,18 +102,26 @@ export const uiManager = {
         const c = document.getElementById('scoreboard-list'); 
         if (!c) return;
         
-        c.innerHTML = '';
         const players = appStore.get('players') || {};
         
-        Object.values(players).sort((a,b)=>(b.scores?.total || 0) - (a.scores?.total || 0)).forEach(p => {
-            const theme = animalThemes[p.team] || animalThemes['eagle'];
-            const tBorder = tailwindColors[theme.color].border;
-            c.innerHTML += `
+        // 🔥 FIX: was `c.innerHTML = ''` then `c.innerHTML += ...` inside
+        // the forEach. Each `+=` re-serializes and re-parses the ENTIRE
+        // accumulated string and rebuilds every already-rendered node from
+        // scratch — O(n²) work for n players, and since this runs on
+        // every real-time roster update, it gets worse as a class grows.
+        // Build the HTML once as an array, join, and assign a single time.
+        const rows = Object.values(players)
+            .sort((a, b) => (b.scores?.total || 0) - (a.scores?.total || 0))
+            .map(p => {
+                const theme = animalThemes[p.team] || animalThemes['eagle'];
+                return `
             <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border bg-white/80 dark:bg-slate-800/80 backdrop-blur-md shadow-sm border-slate-200 dark:border-white/10 text-slate-800 dark:text-white transition-all hover:scale-105">
-                <img src="${p.avatar}" class="w-6 h-6 rounded-full border ${p.border || 'border-slate-300'} object-cover bg-slate-100 dark:bg-slate-900">
+                <img src="${getAvatarUrl(p.avatar)}" onerror="${AVATAR_ONERROR}" class="w-6 h-6 rounded-full border ${p.border || 'border-slate-300'} object-cover bg-slate-100 dark:bg-slate-900">
                 <span class="pl-1 font-bold text-sm leading-none">${p.name}: <span class="${tailwindColors[theme.color].text}">${p.scores?.total || 0}</span></span>
             </div>`;
-        });
+            });
+
+        c.innerHTML = rows.join('');
     },
     
     lockModule() { 
@@ -135,9 +163,10 @@ export const uiManager = {
     },
 
     renderStudy() {
-        const c = document.getElementById('flashcards-container'); if(!c) return; c.innerHTML = '';
-        window.lessonData.vocabulary.forEach(item => { 
-            c.innerHTML += `
+        const c = document.getElementById('flashcards-container'); if(!c) return;
+        // 🔥 FIX: same innerHTML += anti-pattern as updateScoreboard() —
+        // build once, assign once.
+        const cards = (window.lessonData.vocabulary || []).map(item => `
             <div class="perspective-1000 h-48 w-full group">
                 <div class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-md hover:shadow-xl rounded-2xl cursor-pointer transition-all duration-500" onclick="this.parentElement.classList.toggle('flipped')">
                     <div class="backface-hidden absolute w-full h-full bg-white dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col justify-center items-center p-6">
@@ -148,8 +177,33 @@ export const uiManager = {
                         <p class="text-white font-medium text-base md:text-lg leading-relaxed drop-shadow-md">${item.def}</p>
                     </div>
                 </div>
-            </div>`; 
-        });
+            </div>`);
+        c.innerHTML = cards.join('');
+    },
+
+    // 🔥 FIX (missing function): GameController.js's `startModule()` calls
+    // `window.uiManager.renderSpelling(targetData)` for Module 6 (Spelling
+    // Bee), but this function did not exist anywhere in UIController.js.
+    // Every time a student reached the Spelling module, this threw
+    // `TypeError: window.uiManager.renderSpelling is not a function` and
+    // broke the module entirely. Implemented to match the pattern
+    // `submitSpelling()` in GameController.js expects: a `#spelling-input`
+    // with its `dataset.target` set to the answer, plus a "Listen" button
+    // that speaks the word. ASSUMPTION: `data.word` holds the word to
+    // spell — adjust the field name if your `spellingBee` records use a
+    // different key (e.g. `data.term`).
+    renderSpelling(data) {
+        const inp = document.getElementById('spelling-input');
+        if (inp) {
+            inp.value = '';
+            inp.dataset.target = data.word;
+        }
+
+        const listenBtn = document.getElementById('btn-spelling-listen');
+        if (listenBtn) listenBtn.onclick = () => window.speakText(data.word);
+
+        const promptEl = document.getElementById('spelling-prompt');
+        if (promptEl && data.hint) promptEl.innerText = data.hint;
     },
     
     initPuzzleUI(opponentName, bgImage, gridSize) {
@@ -378,8 +432,8 @@ export const uiManager = {
         
         grid.className = `grid gap-2 md:gap-4 w-full transition-all duration-500 ${cols}`;
         
-        cards.forEach((card, i) => {
-            grid.innerHTML += `
+        // 🔥 FIX: same innerHTML += anti-pattern as elsewhere in this file.
+        const cardEls = cards.map((card, i) => `
             <div class="perspective-1000 aspect-[4/3] w-full group cursor-pointer hover:scale-105 active:scale-95 transition-all duration-300" onclick="if(window.game && window.game.handleMemoryClick) window.game.handleMemoryClick(${i})">
                 <div id="mem-card-${i}" class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-sm hover:shadow-lg rounded-xl transition-transform duration-500">
                     <div class="front-face flex flex-col justify-center items-center p-2 cursor-pointer z-20 absolute inset-0 rounded-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-white/10">
@@ -389,8 +443,8 @@ export const uiManager = {
                         <div class="font-bold text-sm md:text-base break-words w-full dark:text-white drop-shadow-sm">${card.content}</div>
                     </div>
                 </div>
-            </div>`;
-        });
+            </div>`);
+        grid.innerHTML = cardEls.join('');
         
         this.updateMemoryProgress();
     },
@@ -426,7 +480,14 @@ export const uiManager = {
     },
 
     renderAudio(data) {
-        document.getElementById('btn-audio-listen').onclick = () => window.speakText(data.desc); const c = document.getElementById('audio-options-container'); c.innerHTML = ''; c.dataset.answer = data.answer;
+        // 🔥 FIX: `.onclick` was set directly on the getElementById result
+        // with no null check — same crash risk as renderQuiz above.
+        const listenBtn = document.getElementById('btn-audio-listen');
+        const c = document.getElementById('audio-options-container');
+        if (!listenBtn || !c) return;
+
+        listenBtn.onclick = () => window.speakText(data.desc);
+        c.innerHTML = ''; c.dataset.answer = data.answer;
         data.options.forEach((opt, idx) => { 
             const btn = document.createElement('button'); 
             btn.className = "w-full text-left p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300"; 
@@ -437,7 +498,10 @@ export const uiManager = {
     },
     
     renderHangman(phrase) {
-        this.updateHangmanArt(); this.updateHangmanWord(); const kbd = document.getElementById('hangman-keyboard'); kbd.innerHTML = '';
+        this.updateHangmanArt(); this.updateHangmanWord();
+        const kbd = document.getElementById('hangman-keyboard');
+        if (!kbd) return; // 🔥 FIX: was unguarded — would throw before rendering any letters
+        kbd.innerHTML = '';
         'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(char => { 
             const btn = document.createElement('button'); 
             btn.id = `hm-btn-${char}`; 
@@ -447,9 +511,14 @@ export const uiManager = {
             kbd.appendChild(btn); 
         });
     },
-    updateHangmanArt() { document.getElementById('hangman-art').innerText = hangmanArtFrames[appStore.get('localGameData').hmStrikes]; },
+    updateHangmanArt() {
+        const artEl = document.getElementById('hangman-art');
+        if (artEl) artEl.innerText = hangmanArtFrames[appStore.get('localGameData').hmStrikes]; // 🔥 FIX: was unguarded
+    },
     updateHangmanWord() {
-        const c = document.getElementById('hangman-word'); c.innerHTML = '';
+        const c = document.getElementById('hangman-word');
+        if (!c) return; // 🔥 FIX: was unguarded
+        c.innerHTML = '';
         appStore.get('localGameData').hmPhrase.split('').forEach(char => { const span = document.createElement('span'); if (char === ' ') span.innerHTML = '&nbsp;&nbsp;'; else { span.className = "border-b-4 border-indigo-700 dark:border-indigo-400 mx-1 w-6 inline-block text-center shadow-sm"; span.innerText = appStore.get('localGameData').hmGuessed.includes(char) ? char : '_'; } c.appendChild(span); });
     },
     
@@ -461,10 +530,19 @@ export const uiManager = {
         const targetEl = document.getElementById('read-aloud-target');
         if(targetEl) targetEl.innerHTML = wrappedText; 
         
-        const btn = document.getElementById('btn-record-read'); 
-        btn.style.pointerEvents = 'auto';
-        btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-black py-4 px-10 rounded-full shadow-[0_0_20px_rgba(244,63,94,0.4)] text-xl mx-auto flex items-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95"; 
-        document.getElementById('record-icon').innerText = "Record"; document.getElementById('record-text').innerText = "Start Recording";
+        // 🔥 FIX: none of these three lookups were null-checked — a missing
+        // element would throw and abort the rest of renderReadAloud(),
+        // including the status reset and the stopReadAloud() cleanup call
+        // below.
+        const btn = document.getElementById('btn-record-read');
+        if (btn) {
+            btn.style.pointerEvents = 'auto';
+            btn.className = "bg-rose-500 hover:bg-rose-600 text-white font-black py-4 px-10 rounded-full shadow-[0_0_20px_rgba(244,63,94,0.4)] text-xl mx-auto flex items-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95";
+        }
+        const recordIcon = document.getElementById('record-icon');
+        if (recordIcon) recordIcon.innerText = "Record";
+        const recordText = document.getElementById('record-text');
+        if (recordText) recordText.innerText = "Start Recording";
         const status = document.getElementById('read-status-feedback');
         if (status) { 
             status.innerHTML = '<span class="text-slate-400">Ready to record</span>'; 
@@ -486,7 +564,14 @@ export const uiManager = {
     },
     
     renderQuiz(data) {
-        document.getElementById('quiz-question-text').innerText = data.q; const c = document.getElementById('quiz-options-container'); c.innerHTML = ''; c.dataset.answer = data.answer;
+        // 🔥 FIX: neither element was null-checked — if either is missing
+        // from the DOM this throws and the whole module fails to render
+        // with no fallback.
+        const qEl = document.getElementById('quiz-question-text');
+        const c = document.getElementById('quiz-options-container');
+        if (!qEl || !c) return;
+
+        qEl.innerText = data.q; c.innerHTML = ''; c.dataset.answer = data.answer;
         data.options.forEach((opt, index) => { 
             const btn = document.createElement('button'); 
             btn.className = "w-full text-left p-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-800 dark:text-white hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300"; 
@@ -497,11 +582,16 @@ export const uiManager = {
     },
     
     showFinalResults(playersObj) {
-        this.hideAll(); 
-        document.getElementById('module-12').classList.remove('hidden'); 
-        document.getElementById('game-status').classList.add('hidden'); 
-        document.getElementById('scoreboard-container').classList.add('hidden'); 
-        document.getElementById('wait-overlay').classList.add('hidden');
+        this.hideAll();
+        // 🔥 FIX: these four were called with zero null-checks. This
+        // function fires exactly once, at the single most important
+        // moment (end of game) — if any one of these elements is missing
+        // in a given UI layout, the whole results screen (leaderboard,
+        // confetti, personal stats) previously failed to render at all.
+        document.getElementById('module-12')?.classList.remove('hidden');
+        document.getElementById('game-status')?.classList.add('hidden');
+        document.getElementById('scoreboard-container')?.classList.add('hidden');
+        document.getElementById('wait-overlay')?.classList.add('hidden');
         
         let teamScores = {};
         appStore.get('teams').forEach(t => teamScores[t.id] = 0);
@@ -526,20 +616,22 @@ export const uiManager = {
         }
 
         const sorted = Object.values(playersObj).sort((a,b) => (b.scores?.total || 0) - (a.scores?.total || 0)); 
-        const list = document.getElementById('final-leaderboard-list'); 
-        if(list) list.innerHTML = '';
-        
-        sorted.forEach((p, i) => {
+        const list = document.getElementById('final-leaderboard-list');
+
+        // 🔥 FIX: same innerHTML += anti-pattern as updateScoreboard() /
+        // renderStudy() — build once, assign once. Also fixes the same
+        // missing-avatar-path bug (`p.avatar` needs getAvatarUrl()).
+        const rows = sorted.map((p, i) => {
             const medal = getRankEmoji(p.scores?.total || 0, Object.values(playersObj));
             const theme = animalThemes[p.team] || animalThemes['eagle'];
             const tColorClass = tailwindColors[theme.color].text;
 
-            if(list) list.innerHTML += `
+            return `
             <li class="flex justify-between items-center p-4 bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-white/10 shadow-lg mb-4 transform hover:-translate-y-1 transition-all">
                 <div class="flex items-center gap-4">
                     <span class="font-black text-slate-400 dark:text-slate-500 text-2xl w-8 text-center drop-shadow-sm">${i+1}.</span>
                     <div class="relative">
-                        <img src="${p.avatar}" class="w-14 h-14 rounded-full object-cover border-4 ${p.border || 'border-slate-300'} bg-slate-100 dark:bg-slate-700 shadow-inner">
+                        <img src="${getAvatarUrl(p.avatar)}" onerror="${AVATAR_ONERROR}" class="w-14 h-14 rounded-full object-cover border-4 ${p.border || 'border-slate-300'} bg-slate-100 dark:bg-slate-700 shadow-inner">
                         ${medal ? `<span class="absolute -bottom-2 -right-2 text-3xl drop-shadow-lg filter hover:scale-110 transition-transform cursor-default">${medal}</span>` : ''}
                     </div>
                     <div class="flex flex-col">
@@ -548,13 +640,25 @@ export const uiManager = {
                     </div>
                 </div>
                 <span class="font-black text-indigo-600 dark:text-indigo-400 text-4xl drop-shadow-md pr-4">${p.scores?.total || 0} pts</span>
-            </li>`; 
+            </li>`;
         });
+
+        if (list) list.innerHTML = rows.join('');
         
         if(appStore.get('role') === 'student') {
-            document.getElementById('student-personal-stats').classList.remove('hidden'); const bars = document.getElementById('student-skill-bars'); bars.innerHTML = '';
+            // 🔥 FIX: `.classList` and `bars.innerHTML` were both accessed
+            // without null checks, and `bars.innerHTML += ...` had the same
+            // O(n²) rebuild-in-a-loop issue as elsewhere in this file.
+            document.getElementById('student-personal-stats')?.classList.remove('hidden');
+            const bars = document.getElementById('student-skill-bars');
             const me = appStore.get('me');
-            ['Speaking', 'Writing', 'Listening', 'General'].forEach(sk => { const pts = me.scores[sk] || 0; bars.innerHTML += `<div><div class="flex justify-between text-sm font-bold text-slate-600 dark:text-slate-300 mb-1 tracking-wider uppercase"><span>${sk}</span><span class="text-indigo-600 dark:text-indigo-400">${pts} pts</span></div><div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-4 shadow-inner"><div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-4 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000" style="width: ${Math.min(100, Math.max(0, pts*10))}%"></div></div></div>`; });
+            if (bars && me) {
+                const skillBars = ['Speaking', 'Writing', 'Listening', 'General'].map(sk => {
+                    const pts = me.scores[sk] || 0;
+                    return `<div><div class="flex justify-between text-sm font-bold text-slate-600 dark:text-slate-300 mb-1 tracking-wider uppercase"><span>${sk}</span><span class="text-indigo-600 dark:text-indigo-400">${pts} pts</span></div><div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-4 shadow-inner"><div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-4 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000" style="width: ${Math.min(100, Math.max(0, pts*10))}%"></div></div></div>`;
+                });
+                bars.innerHTML = skillBars.join('');
+            }
         }
         
         const cv = document.getElementById('confetti-canvas'); 
