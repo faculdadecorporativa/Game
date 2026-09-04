@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Power of Feedback - Multiplayer RPG</title>
+    
+    <!-- CDNs -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pocketbase/dist/pocketbase.umd.js"></script>
+    <script type="text/javascript">
+       (function(){
+          emailjs.init({ publicKey: "XY0DjHoAeZqWKqnoV" });
+       })();
+    </script>
+
+    <style>
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .flip-card-inner { transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); }
+        .flipped .flip-card-inner { transform: rotateY(180deg); }
+        .matched { opacity: 0.5; pointer-events: none; filter: grayscale(100%); }
+        
+        /* Premium Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.5); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.8); }
+
+        /* Toast Animation */
+        .toast-enter { animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .toast-exit { animation: toastOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(100%) scale(0.9); } to { opacity: 1; transform: translateX(0) scale(1); } }
+        @keyframes toastOut { from { opacity: 1; transform: translateX(0) scale(1); } to { opacity: 0; transform: translateX(100%) scale(0.9); } }
+
+        /* Universal Circular & Transparent Avatar Formatting */
+        .avatar-img, 
+        .avatar-circle, 
+        img[src*="avatar"], 
+        img[data-avatar="true"],
+        gamified-shop img,
+        student-dashboard img.user-avatar {
+            border-radius: 50% !important;
+            object-fit: cover !important;
+            aspect-ratio: 1 / 1 !important;
+            background-color: transparent !important;
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .avatar-img:hover,
+        .avatar-circle:hover,
+        img[src*="avatar"]:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+        }
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        window.startConfetti = function() {
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, zIndex: 99999 });
+        };
+    </script>
+  <script type="module" crossorigin src="/assets/index-C4AENz1l.js"></script>
+</head>
+
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white relative overflow-x-hidden pb-12 transition-colors duration-300">
+    
+    <div class="hidden dark:block fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
+    <div class="hidden dark:block fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-300"></div>
+
+
+    <div id="toast-container" class="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-[999999] flex flex-col gap-4 pointer-events-none"></div>
+
+    <div id="prof-cheer-container" class="fixed bottom-8 right-8 z-[99999] flex items-end gap-3 transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div class="bg-white dark:bg-slate-900/80 backdrop-blur-xl text-indigo-800 dark:text-indigo-300 border border-indigo-600 dark:border-indigo-500/30 px-6 py-4 rounded-3xl rounded-br-none shadow-2xl dark:shadow-[0_0_30px_rgba(99,102,241,0.3)] font-black text-xl" id="prof-cheer-text">Good job!</div>
+        <div class="w-20 h-20 rounded-full bg-indigo-100 dark:bg-slate-800/80 backdrop-blur-md border-2 border-indigo-600 dark:border-indigo-500/50 flex items-center justify-center text-5xl shadow-xl dark:shadow-[0_0_20px_rgba(99,102,241,0.4)] transform scale-x-[-1]">👨‍🏫</div>
+    </div>
+
+    <!-- Wait Overlay Wrapper -->
+    <div id="wait-overlay" class="hidden fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[999999] flex-col items-center justify-center transition-all duration-500">
+        <div class="bg-slate-800/80 p-10 md:p-16 rounded-[2.5rem] border border-indigo-500/50 shadow-[0_0_60px_rgba(79,70,229,0.5)] flex flex-col items-center text-center max-w-lg mx-4 transform scale-105">
+            <div class="mb-8 border-4 border-white/10 border-t-indigo-500 rounded-full w-20 h-20 animate-spin shadow-[0_0_20px_rgba(99,102,241,0.4)]"></div>
+            <h2 class="text-white text-3xl md:text-5xl font-black mb-4 drop-shadow-lg tracking-tight">Waiting for Professor...</h2>
+            <p class="text-indigo-400 text-lg md:text-xl font-bold uppercase tracking-widest">Hold tight!</p>
+        </div>
+    </div>
+
+    <app-header class="relative z-20"></app-header>
+
+    <main class="w-full max-w-[1920px] mx-auto px-2 sm:px-6 py-8 relative z-10 transition-all duration-300">
+        
+        <role-selection id="module-0"></role-selection>
+        <module-join-pin id="module-join-pin" class="hidden fade-in w-full block mt-20"></module-join-pin>
+        <prof-dashboard id="module-admin" class="hidden fade-in w-full block"></prof-dashboard>
+        <student-lobby id="module-waiting" class="hidden fade-in w-full block mt-20"></student-lobby>
+
+        <!-- Dynamic Game Modules -->
+        <student-dashboard id="module-dashboard" class="hidden fade-in w-full block mt-20"></student-dashboard>
+        <gamified-shop id="module-shop" class="hidden fade-in w-full block mt-10 mb-20"></gamified-shop>
+
+        <div id="lifelines-panel" class="hidden max-w-3xl mx-auto mb-6 bg-white dark:bg-slate-900/40 backdrop-blur-none dark:backdrop-blur-2xl border border-slate-200 dark:border-white/10 p-3 rounded-xl dark:rounded-2xl shadow-lg flex justify-center space-x-2 sm:space-x-4 relative z-10 transition-colors duration-300">
+            <button onclick="window.lifelineManager.use('fiftyFifty')" id="ll-fiftyFifty" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-lg sm:text-xl font-black text-indigo-600 dark:text-white">50/50</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Half Off</span></button>
+            <button onclick="window.lifelineManager.use('askProf')" id="ll-askProf" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl">👨‍🏫</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Ask Prof</span></button>
+            <button onclick="window.lifelineManager.use('google')" id="ll-google" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl">🛜</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Database</span></button>
+            <button onclick="window.lifelineManager.use('callFriend')" id="ll-callFriend" class="lifeline-btn flex flex-col items-center justify-center bg-slate-100 dark:bg-white/5 hover:bg-indigo-600 dark:hover:bg-indigo-500/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/5 dark:hover:border-indigo-400 hover:shadow-none dark:hover:shadow-[0_0_15px_rgba(79,70,229,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all duration-300 hover:-translate-y-1"><span class="text-xl">📞</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">Comm-Link</span></button>
+            <button onclick="window.lifelineManager.use('freezeTime')" id="ll-freezeTime" class="lifeline-btn flex flex-col items-center justify-center bg-cyan-100 dark:bg-cyan-900/20 hover:bg-cyan-500 text-cyan-800 dark:text-cyan-200 border border-cyan-200 dark:border-cyan-500/30 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all hover:-translate-y-1"><span class="text-xl">❄️</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 font-bold">Freeze</span></button>
+            <button onclick="window.lifelineManager.use('timeBurn')" id="ll-timeBurn" class="lifeline-btn flex flex-col items-center justify-center bg-rose-100 dark:bg-rose-900/20 hover:bg-rose-500 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-500/30 hover:shadow-[0_0_15px_rgba(244,63,94,0.4)] rounded-lg dark:rounded-xl p-2 w-20 sm:w-24 transition-all hover:-translate-y-1"><span class="text-xl">🔥</span><span class="text-[9px] sm:text-[10px] uppercase tracking-wider mt-1 font-bold">Burn</span></button>
+        </div>
+
+        <module-one id="module-1" class="hidden fade-in text-center max-w-4xl mx-auto"></module-one>
+        <module-two id="module-2" class="hidden fade-in text-center max-w-4xl mx-auto"></module-two>
+        <module-three id="module-3" class="hidden fade-in text-center max-w-4xl mx-auto"></module-three>
+        <module-four id="module-4" class="hidden fade-in text-center w-full mx-auto"></module-four>
+        <module-five id="module-5" class="hidden fade-in text-center max-w-2xl mx-auto"></module-five>
+        <module-six id="module-6" class="hidden fade-in text-center max-w-xl mx-auto"></module-six>
+        <module-seven id="module-7" class="hidden fade-in text-center max-w-3xl mx-auto"></module-seven>
+        <module-eight id="module-8" class="hidden fade-in text-center max-w-5xl mx-auto"></module-eight>
+        <module-nine id="module-9" class="hidden fade-in text-center max-w-3xl mx-auto"></module-nine>
+        <module-ten id="module-10" class="hidden fade-in text-center max-w-3xl mx-auto"></module-ten>
+        <module-eleven id="module-11" class="hidden fade-in text-center max-w-2xl mx-auto"></module-eleven>
+        <module-twelve id="module-12" class="hidden fade-in text-center"></module-twelve>
+    </main>
+
+    <app-modals id="modal-overlay" class="relative z-50"></app-modals>
+    <canvas id="confetti-canvas"></canvas>
+
+</body>
+</html>
