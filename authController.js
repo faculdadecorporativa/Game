@@ -180,7 +180,6 @@ export const authUI = {
             if (this.isRegistering) {
                 if (!profId) throw new Error("Please select a Professor.");
                 
-                // Pass DEFAULT_AVATAR directly instead of an uploaded image
                 await authManager.registerStudent(cc, phone, pass, name, DEFAULT_AVATAR, profId);
 
                 if (window.toast) window.toast(`Account registered! Waiting for professor approval.`, true);
@@ -266,14 +265,22 @@ document.addEventListener("DOMContentLoaded", () => {
 export async function handleCharacterSelection(userId, imageName) {
     try {
         if (!window.pb) throw new Error("PocketBase client not found.");
+        
+        const finalAvatar = imageName || DEFAULT_AVATAR;
         const playerRecord = await pb.collection('players').getFirstListItem(`user="${userId}"`);
-        await pb.collection('players').update(playerRecord.id, { avatar: imageName || DEFAULT_AVATAR });
+        await pb.collection('players').update(playerRecord.id, { avatar: finalAvatar });
 
         let me = appStore.get('me');
         if (me) {
-            me.avatar = imageName || DEFAULT_AVATAR;
+            me.avatar = finalAvatar;
             appStore.set('me', me);
         }
+
+        // Apply avatar-img class to all dynamic user avatar elements across the interface
+        document.querySelectorAll('.user-avatar, [data-user-avatar]').forEach(img => {
+            img.src = finalAvatar;
+            img.classList.add('avatar-img');
+        });
 
         if (window.toast) window.toast("Character selected successfully!", true);
 

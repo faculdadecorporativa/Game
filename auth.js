@@ -190,7 +190,9 @@ export const authManager = {
                 phone: phone,
                 professorId: profId,
                 role: 'student',
-                status: 'pending'
+                status: 'pending',
+                // 🔥 FIX: Grant free starter avatars automatically upon registration
+                inventory: { 'king-david': true, 'ruth': true } 
             };
             await pb.collection('players').create(studentData);
         } catch (profileErr) {
@@ -246,7 +248,8 @@ export const authManager = {
             maxStreak: studentProfile.maxStreak || 0,
             xp: studentProfile.xp || 0,
             coins: studentProfile.coins || 0,
-            inventory: studentProfile.inventory || {},
+            // 🔥 FIX: Ensure existing users get the base inventory if it doesn't exist in the DB yet
+            inventory: studentProfile.inventory || { 'king-david': true, 'ruth': true },
             equipped: studentProfile.equipped || { title: 'Novice Learner', border: 'border-slate-300' }
         };
 
