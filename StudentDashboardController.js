@@ -9,10 +9,18 @@ export const dashboardController = {
     },
 
     // 🔥 RPG BADGES & ACHIEVEMENTS 🔥
+    // 🔥 FIX: `treasured` and `first_blood` previously checked LIVE current
+    // values (`me.coins`, `me.scores.total`). Both of those can go DOWN —
+    // coins get spent in the shop, and `scores.total` can drop from wrong
+    // answers (submitScore subtracts points on misses). That meant an
+    // already-"earned" badge could visually re-lock mid-session, which
+    // isn't how achievements are supposed to work. Both now check a
+    // session-tracked historical high-water mark instead (computed in
+    // renderDashboard(), same pattern already used for `maxStreak`).
     badges: [
-        { id: 'first_blood', name: 'First Blood', icon: '&#129351;', desc: 'Earn your first points', req: (me) => (me.scores?.total || 0) > 0 },
+        { id: 'first_blood', name: 'First Blood', icon: '&#129351;', desc: 'Earn your first points', req: (me) => (me.maxScoreEverHeld ?? me.scores?.total ?? 0) > 0 },
         { id: 'streak_master', name: 'On Fire', icon: '&#128293;', desc: 'Reach a 3-answer streak', req: (me) => (me.maxStreak || me.streak || 0) >= 3 },
-        { id: 'treasured', name: 'Treasured', icon: '&#128142;', desc: 'Hold 100+ coins at once', req: (me) => (me.coins || 0) >= 100 },
+        { id: 'treasured', name: 'Treasured', icon: '&#128142;', desc: 'Hold 100+ coins at once', req: (me) => (me.maxCoinsEverHeld || me.coins || 0) >= 100 },
         { id: 'shopper', name: 'Big Spender', icon: '&#128722;', desc: 'Buy an item from the Shop', req: (me) => Object.keys(me.inventory || {}).length > 0 }
     ],
 
@@ -26,27 +34,60 @@ export const dashboardController = {
         const me = appStore.get('me');
         if (!me) return;
 
-        // Auto-track their highest streak ever achieved for Badges
-        if ((me.streak || 0) > (me.maxStreak || 0)) me.maxStreak = me.streak;
+        // 🔥 NOTE: `me` here is a disposable clone — appStore.get() always
+        // deep-clones (see store.js), so mutating fields on it below never
+        // touches the real store and is never persisted anywhere by this
+        // function. That's intentional for `maxStreak`: GameController.js's
+        // submitScore() already owns the REAL, persisted maxStreak update
+        // (it calls appStore.set() and syncs to PocketBase). This local
+        // normalization only exists so THIS render's badge check is
+        // accurate even in the edge case where the dashboard is opened
+        // without having gone through submitScore() first (e.g. stored
+        // maxStreak is stale relative to the current live streak).
+        me.maxStreak = Math.max(me.maxStreak || 0, me.streak || 0);
+
+        // Session-scoped historical highs for coins/score, used only to
+        // keep the badges above from flickering between earned/locked as
+        // those values naturally rise and fall during play. Stored in
+        // `localGameData` (already used for `lastKnownLevel` below) so
+        // they survive for the length of the session — NOTE: like the rest
+        // of `localGameData`, this resets on page reload. True permanence
+        // across sessions would need a dedicated PocketBase field (e.g.
+        // `me.badgesUnlocked`); flagging that as a possible follow-up
+        // rather than introducing a schema change here.
+        let d = appStore.get('localGameData') || {};
+        d.maxCoinsEverHeld = Math.max(d.maxCoinsEverHeld || 0, me.coins || 0);
+        d.maxScoreEverHeld = Math.max(d.maxScoreEverHeld || 0, me.scores?.total || 0);
+        me.maxCoinsEverHeld = d.maxCoinsEverHeld;
+        me.maxScoreEverHeld = d.maxScoreEverHeld;
 
         const currentLevel = this.calculateLevel(me.xp);
         const nextLevelXp = Math.pow((currentLevel) / 0.1, 2);
         const currentLevelBaseXp = Math.pow((currentLevel - 1) / 0.1, 2);
         const progressPercent = Math.min(100, Math.max(0, ((me.xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100));
 
-        const previousLevel = appStore.get('localGameData')?.lastKnownLevel || 1;
+        const previousLevel = d.lastKnownLevel || 1;
         if (currentLevel > previousLevel) {
             if (window.startConfetti) window.startConfetti();
             if (window.sfx) window.sfx.play('correct');
             if (window.toast) window.toast(`&#127881; Level Up! You are now Level ${currentLevel}!`, true);
-            
-            let d = appStore.get('localGameData') || {};
             d.lastKnownLevel = currentLevel;
-            appStore.set('localGameData', d);
         }
 
+        // Single write for everything localGameData-related computed above
+        // (previously this was written only inside the level-up branch,
+        // which meant maxCoinsEverHeld/maxScoreEverHeld — needed on every
+        // render, not just level-ups — would never have been persisted for
+        // the session under the old structure).
+        appStore.set('localGameData', d);
+
         const nameEl = document.getElementById('dash-name');
-        if(nameEl) nameEl.innerText = me.displayName || me.name || "Student";
+        // 🔥 CLEANUP: `me.displayName` isn't a field anywhere in this app's
+        // profile schema (see store.js / auth.js's loginStudent) — it was
+        // always undefined, so this silently fell through to `me.name`
+        // every time. Simplified to match what's actually there; if you
+        // add a display-name field later this is the one line to restore.
+        if(nameEl) nameEl.innerText = me.name || "Student";
         
         const titleEl = document.getElementById('dash-title');
         if(titleEl) titleEl.innerText = me.equipped?.title || "Novice Learner";

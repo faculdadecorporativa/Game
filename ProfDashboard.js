@@ -2,8 +2,19 @@
 // Strict Dual-Mode Framework: Crisp Light / Glass Dark
 
 export class ProfDashboard extends HTMLElement {
-    
+
     connectedCallback() {
+        // 🔥 FIX: same idempotent-render issue as StudentLobby.js /
+        // RoleSelection.js — connectedCallback() re-fires on every
+        // (re)connect, and render() does a full innerHTML replace. This
+        // component holds the ENTIRE admin authoring UI (lesson content
+        // editors, drawn hotspot targets, team/roster forms, module
+        // toggles) — a stray reconnect here would silently wipe far more
+        // in-progress professor work than in the smaller components. This
+        // guard is arguably more important here than anywhere else it's
+        // been applied so far.
+        if (this._rendered) return;
+        this._rendered = true;
         this.render();
     }
 
@@ -247,7 +258,7 @@ export class ProfDashboard extends HTMLElement {
                                     
                                     <!-- 🔥 UPGRADED: Cinematic aspect-video container for accurate drawing 🔥 -->
                                     <div id="mod3-draw-container" class="relative w-full aspect-video overflow-hidden border-2 border-indigo-400 dark:border-indigo-500/50 rounded-2xl cursor-crosshair mb-4 select-none bg-slate-100 dark:bg-slate-900/80 transition-all duration-300 shadow-inner">
-                                        <img id="mod3-admin-bg" src="https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&q=80" class="w-full h-full object-contain pointer-events-none">
+                                        <img id="mod3-admin-bg" src="https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&q=80" alt="Hotspot activity background" onerror="this.onerror=null;this.style.opacity='0.15';" class="w-full h-full object-contain pointer-events-none">
                                         <div id="mod3-admin-layer" class="absolute inset-0"></div>
                                     </div>
                                     
@@ -377,7 +388,7 @@ export class ProfDashboard extends HTMLElement {
                             
                             <div class="flex flex-col md:flex-row gap-5 items-start">
                                 <div class="relative w-20 h-20 shrink-0 rounded-full bg-slate-100 dark:bg-slate-900/50 border border-slate-300 dark:border-white/20 overflow-hidden transition-colors duration-300 shadow-inner">
-                                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" id="new-prof-avatar-preview" class="w-full h-full object-cover opacity-50">
+                                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" id="new-prof-avatar-preview" alt="Professor avatar preview" class="w-full h-full object-cover opacity-50">
                                     <input type="file" accept="image/*" onchange="adminUI.handleProfAvatar(event)" class="absolute inset-0 opacity-0 cursor-pointer" title="Change Professor Photo">
                                 </div>
                                 <div class="w-full space-y-3">
@@ -421,7 +432,7 @@ export class ProfDashboard extends HTMLElement {
                             <div class="mb-8">
                                 <div class="flex flex-col lg:flex-row gap-4 items-center">
                                     <div class="relative w-12 h-12 shrink-0 bg-slate-100 dark:bg-slate-900/50 rounded-full border border-slate-300 dark:border-white/20 overflow-hidden transition-colors duration-300 shadow-inner">
-                                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" id="manual-student-avatar-preview" class="w-full h-full object-cover opacity-30">
+                                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" id="manual-student-avatar-preview" alt="New student avatar preview" class="w-full h-full object-cover opacity-30">
                                         <input type="file" accept="image/*" onchange="adminUI.handleManualStudentAvatar(event)" class="absolute inset-0 opacity-0 cursor-pointer" title="Upload Photo">
                                     </div>
 
@@ -492,4 +503,8 @@ export class ProfDashboard extends HTMLElement {
     }
 }
 
-customElements.define('prof-dashboard', ProfDashboard);
+// 🔥 FIX: same Vite-HMR redefinition crash risk as StudentLobby.js —
+// `customElements.define()` throws if this module is evaluated twice.
+if (!customElements.get('prof-dashboard')) {
+    customElements.define('prof-dashboard', ProfDashboard);
+}

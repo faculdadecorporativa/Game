@@ -98,7 +98,7 @@ export const authManager = {
                 await emailjs.send(EMAIL_CONFIG.serviceID, EMAIL_CONFIG.templateID, {
                     prof_name: name,
                     prof_email: email,
-                    page_name: "E-Learning Platform",
+                    page_name: "Faculdade Corporativa",
                     action_link: adminLink
                 });
             } catch (emailError) {
