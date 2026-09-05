@@ -175,23 +175,43 @@ export class AppHeader extends HTMLElement {
             const container = this.querySelector('#jitsi-iframe-container');
             container.innerHTML = ''; // Reset container
 
+            // Identify user from PocketBase (if available)
+            const pbUser = window.pb?.authStore?.record;
+            const isModerator = pbUser?.role === 'professor'; // Assigns moderator capability to professors
+            const baseName = pbUser?.name || (isModerator ? 'Moderator' : 'Student');
+
             const domain = 'meet.jit.si';
             const options = {
                 roomName: roomName,
                 width: '100%',
                 height: '100%',
                 parentNode: container,
+                
+                // 🛡️ User Configuration (Moderator Setup)
+                userInfo: {
+                    email: pbUser?.email || '',
+                    displayName: isModerator ? `⭐ ${baseName} (Moderator)` : baseName,
+                    moderator: isModerator // Flags user as a moderator to the frontend UI
+                },
+
                 interfaceConfigOverwrite: {
+                    // 🚫 Force Hide Jitsi Logos & Watermarks
                     SHOW_JITSI_WATERMARK: false,
                     SHOW_WATERMARK_FOR_GUESTS: false,
                     SHOW_BRAND_WATERMARK: false,
                     SHOW_POWERED_BY: false,
-                    DEFAULT_LOGO_URL: '',
-                    JITSI_WATERMARK_LINK: '',
+                    HIDE_DEEP_LINKING_LOGO: true,
                     DISPLAY_WELCOME_PAGE_CONTENT: false,
+                    // Use a 1x1 transparent base64 image to override forced server logos
+                    DEFAULT_LOGO_URL: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+                    DEFAULT_WELCOME_PAGE_LOGO_URL: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+                    JITSI_WATERMARK_LINK: '',
+                    BRAND_WATERMARK_LINK: '',
+                    
                     TOOLBAR_BUTTONS: [
                         'microphone', 'camera', 'desktop', 'chat', 'raisehand',
-                        'participants-pane', 'tileview', 'fullscreen', 'hangup'
+                        'participants-pane', 'tileview', 'fullscreen', 'hangup',
+                        'security', 'settings', 'videoquality' // Added security tools for the moderator
                     ]
                 },
                 configOverwrite: {
@@ -203,7 +223,18 @@ export class AppHeader extends HTMLElement {
                     disableDeepLinking: true,
                     startWithAudioMuted: false,
                     startWithVideoMuted: false,
-                    hideConferenceSubject: false
+                    hideConferenceSubject: false,
+                    
+                    // 🛡️ Enable Moderator Controls in UI
+                    remoteVideoMenu: {
+                        disableKick: false,
+                        disableGrantModerator: false // Allows the moderator to promote others to moderator from the participants menu
+                    },
+                    participantsPane: {
+                        hideModeratorSettingsTab: false,
+                        hideMoreActionsButton: false,
+                        hideMuteAllButton: false
+                    }
                 }
             };
 
