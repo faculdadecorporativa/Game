@@ -192,9 +192,14 @@ export class AppHeader extends HTMLElement {
                     ]
                 },
                 configOverwrite: {
-                    startWithAudioMuted: true,
-                    startWithVideoMuted: false,
+                    /* 🚫 Bypass the Prejoin Screen & Sidebar Logo */
                     prejoinPageEnabled: false,
+                    prejoinConfig: {
+                        enabled: false
+                    },
+                    disableDeepLinking: true,
+                    startWithAudioMuted: false,
+                    startWithVideoMuted: false,
                     hideConferenceSubject: false
                 }
             };
