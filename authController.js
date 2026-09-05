@@ -8,6 +8,36 @@ export const authUI = {
     isProfRegistering: false,
     isRegistering: false,
 
+    async handleGoogleLogin() {
+        try {
+            if (!pb) throw new Error("PocketBase client is not initialized.");
+
+            // Trigger Google OAuth2 popup
+            const authData = await pb.collection('players').authWithOAuth2({ 
+                provider: 'google' 
+            });
+
+            // Optional: Save Google profile name if name is empty
+            if (authData.meta && authData.meta.name && !authData.record.name) {
+                await pb.collection('players').update(authData.record.id, {
+                    name: authData.meta.name
+                });
+            }
+
+            if (window.toast) window.toast('Logged in with Google successfully!', true);
+            if (window.uiManager) window.uiManager.closeModals();
+            
+            // Reload window to initiate app state with the new auth token
+            window.location.reload();
+
+        } catch (err) {
+            console.error('Google Auth Error:', err);
+            if (!err.isAbort && window.toast) {
+                window.toast('Google Login failed: ' + err.message, false);
+            }
+        }
+    },
+
     toggleVisibility(inputId) {
         const input = document.getElementById(inputId);
         if (input) {
@@ -242,6 +272,9 @@ export const authUI = {
         this.sendCode();
     }
 };
+
+// ... Ensure global access is set for the DOM to interact with authUI ...
+window.authUI = authUI;
 
 document.addEventListener("DOMContentLoaded", () => {
     const enableEnter = (inputId, actionMethod) => {

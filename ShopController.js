@@ -26,10 +26,24 @@ export const shopController = {
             { id: 'titleUnstoppable', name: "Unstoppable", cost: 500, icon: "&#9732;", desc: "Exclusive, legendary title reserved for streak masters.", equipType: 'title', equipValue: 'Unstoppable', glow: "shadow-[0_0_15px_rgba(239,68,68,0.3)]" }
         ],
         avatars: [
-            { id: 'avatarNinja', name: "Shadow Ninja", cost: 300, icon: "&#129399;", desc: "A silent but deadly learner. Perfect for stealthy points.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%B7%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(71,85,105,0.3)]" },
-            { id: 'avatarRobot', name: "Cyber Bot", cost: 400, icon: "&#129302;", desc: "Automate your success with this high-tech robot avatar.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(14,165,233,0.3)]" },
-            { id: 'avatarWizard', name: "Grand Wizard", cost: 600, icon: "&#129497;", desc: "Master the arcane arts of grammar and vocabulary.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%99%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(139,92,246,0.3)]" },
-            { id: 'avatarAstro', name: "Deep Space", cost: 800, icon: "&#128640;", desc: "Take your learning journey to the absolute stars.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%A8%E2%80%8D%F0%9F%9A%80%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(244,114,182,0.3)]" }
+            { id: 'avatarAbraham', name: "Abraham", cost: 300, icon: "<img src='/avatars/abraham.png' class='w-full h-full object-cover rounded-full' />", desc: "Father of nations. A beacon of unwavering faith.", equipType: 'avatar', equipValue: "/avatars/abraham.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
+            { id: 'avatarPaul', name: "Apostle Paul", cost: 400, icon: "<img src='/avatars/apostle-paul.png' class='w-full h-full object-cover rounded-full' />", desc: "Bold messenger and author of many epistles.", equipType: 'avatar', equipValue: "/avatars/apostle-paul.png", glow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]" },
+            { id: 'avatarPeter', name: "Apostle Peter", cost: 400, icon: "<img src='/avatars/apostle-peter.png' class='w-full h-full object-cover rounded-full' />", desc: "The rock upon which the foundation was built.", equipType: 'avatar', equipValue: "/avatars/apostle-peter.png", glow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" },
+            { id: 'avatarMichael', name: "Archangel Michael", cost: 800, icon: "<img src='/avatars/archangel-michael.png' class='w-full h-full object-cover rounded-full' />", desc: "Mighty defender and leader of the heavenly host.", equipType: 'avatar', equipValue: "/avatars/archangel-michael.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
+            { id: 'avatarDaniel', name: "Daniel", cost: 500, icon: "<img src='/avatars/daniel.png' class='w-full h-full object-cover rounded-full' />", desc: "Unshakable integrity, even in the lions' den.", equipType: 'avatar', equipValue: "/avatars/daniel.png", glow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]" },
+            { id: 'avatarElijah', name: "Elijah", cost: 600, icon: "<img src='/avatars/elijah.png' class='w-full h-full object-cover rounded-full' />", desc: "A powerful prophet who called down fire from heaven.", equipType: 'avatar', equipValue: "/avatars/elijah.png", glow: "shadow-[0_0_15px_rgba(244,63,94,0.3)]" },
+            { id: 'avatarJoseph', name: "Joseph", cost: 500, icon: "<img src='/avatars/joseph.png' class='w-full h-full object-cover rounded-full' />", desc: "Dream interpreter who rose from the pit to the palace.", equipType: 'avatar', equipValue: "/avatars/joseph.png", glow: "shadow-[0_0_15px_rgba(34,211,238,0.3)]" },
+            { id: 'avatarJosuah', name: "Josuah", cost: 600, icon: "<img src='/avatars/josuah.png' class='w-full h-full object-cover rounded-full' />", desc: "Courageous commander who led the people forward.", equipType: 'avatar', equipValue: "/avatars/josuah.png", glow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" },
+            { id: 'avatarDeborah', name: "Judge Deborah", cost: 600, icon: "<img src='/avatars/judge-deborah.png' class='w-full h-full object-cover rounded-full' />", desc: "Wise prophetess and fearless leader in battle.", equipType: 'avatar', equipValue: "/avatars/judge-deborah.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
+            { id: 'avatarSamson', name: "Judge Samson", cost: 700, icon: "<img src='/avatars/judge-samson.png' class='w-full h-full object-cover rounded-full' />", desc: "Blessed with supernatural strength to defeat enemies.", equipType: 'avatar', equipValue: "/avatars/judge-samson.png", glow: "shadow-[0_0_15px_rgba(244,63,94,0.3)]" },
+            { id: 'avatarDavid', name: "King David", cost: 800, icon: "<img src='/avatars/king-david.png' class='w-full h-full object-cover rounded-full' />", desc: "A courageous warrior, psalmist, and king.", equipType: 'avatar', equipValue: "/avatars/king-david.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
+            { id: 'avatarSolomon', name: "King Solomon", cost: 800, icon: "<img src='/avatars/king-solomon.png' class='w-full h-full object-cover rounded-full' />", desc: "Renowned for his unprecedented wisdom and wealth.", equipType: 'avatar', equipValue: "/avatars/king-solomon.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
+            { id: 'avatarMary', name: "Mary", cost: 500, icon: "<img src='/avatars/mary.png' class='w-full h-full object-cover rounded-full' />", desc: "Favored and blessed, a model of humble obedience.", equipType: 'avatar', equipValue: "/avatars/mary.png", glow: "shadow-[0_0_15px_rgba(34,211,238,0.3)]" },
+            { id: 'avatarMoses', name: "Moses", cost: 700, icon: "<img src='/avatars/moses.png' class='w-full h-full object-cover rounded-full' />", desc: "Led his people through the waters into freedom.", equipType: 'avatar', equipValue: "/avatars/moses.png", glow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]" },
+            { id: 'avatarNoah', name: "Noah", cost: 400, icon: "<img src='/avatars/noah.png' class='w-full h-full object-cover rounded-full' />", desc: "Faithful builder who preserved life through the flood.", equipType: 'avatar', equipValue: "/avatars/noah.png", glow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" },
+            { id: 'avatarEsther', name: "Queen Esther", cost: 700, icon: "<img src='/avatars/queen-esther.png' class='w-full h-full object-cover rounded-full' />", desc: "Brave and wise advocate who saved her people.", equipType: 'avatar', equipValue: "/avatars/queen-esther.png", glow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]" },
+            { id: 'avatarRahab', name: "Rahab", cost: 400, icon: "<img src='/avatars/rahab.png' class='w-full h-full object-cover rounded-full' />", desc: "Showed great courage and faith to protect the spies.", equipType: 'avatar', equipValue: "/avatars/rahab.png", glow: "shadow-[0_0_15px_rgba(244,63,94,0.3)]" },
+            { id: 'avatarRuth', name: "Ruth", cost: 400, icon: "<img src='/avatars/ruth.png' class='w-full h-full object-cover rounded-full' />", desc: "A symbol of loyalty, devotion, and redemption.", equipType: 'avatar', equipValue: "/avatars/ruth.png", glow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" }
         ]
     },
 
@@ -141,10 +155,11 @@ export const shopController = {
                 }
             }
 
+            // Updated image rendering container to ensure proper masking of the new profile pictures
             html += `
                 <div class="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-indigo-500/20 p-6 rounded-2xl text-center flex flex-col justify-between transition-all hover:border-indigo-400 dark:hover:border-indigo-400 hover:-translate-y-1 shadow-sm ${item.glow}">
                     <div>
-                        <div class="w-20 h-20 mx-auto bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-4xl mb-4 border border-slate-300 dark:border-white/5 shadow-inner">
+                        <div class="w-20 h-20 mx-auto bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-4xl mb-4 border border-slate-300 dark:border-white/5 shadow-inner overflow-hidden">
                             ${item.icon}
                         </div>
                         <h4 class="font-black text-slate-900 dark:text-white text-xl mb-2">${item.name}</h4>
@@ -170,7 +185,7 @@ export const shopController = {
             if (window.toast) window.toast(`Not enough coins! You need ${item.cost - me.coins} more.`, false);
             if (window.sfx) window.sfx.play('wrong'); 
             
-            // 🔥 UX Feedback: Shake the coin counter to show they are broke!
+            // UX Feedback: Shake the coin counter to show they are broke!
             const coinEl = document.getElementById('shop-coins');
             if (coinEl) {
                 coinEl.classList.add('text-rose-500', 'animate-pulse');
