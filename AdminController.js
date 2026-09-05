@@ -3,7 +3,13 @@
 
 import { tailwindColors, animalThemes } from './data.js';
 import { authManager } from './auth.js';
-import { appStore } from './store.js';
+import { appStore, getAvatarUrl, DEFAULT_AVATAR } from './store.js';
+
+// See the fix note near renderStudentManagement()/manualRegisterStudent()
+// below for the most important finding in this file: student roster
+// management here was operating on a completely different data store than
+// the one actually used for login/gameplay everywhere else in the app.
+const AVATAR_ONERROR = `this.onerror=null;this.src='${getAvatarUrl(null)}';`;
 
 export const adminUI = {
     chartInstance: null, demoChartInstance: null,
@@ -84,10 +90,23 @@ export const adminUI = {
         appStore.set('players', {});
         appStore.set('currentModule', 0);
         
-        const pin = appStore.get('roomCode');
-        if (pin && window.firebaseRef && window.firebaseSet) {
-            const roomRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students`);
-            await window.firebaseSet(roomRef, null);
+        // 🔥 FIX: was clearing a Firebase RTDB path (`rooms/${pin}/students`)
+        // by setting it to null. Migrated to PocketBase: delete every
+        // room-roster row (the `students` collection created in
+        // network.js, related to `rooms` via a `room` field) for this
+        // room. Uses `roomRecordId` (the actual PocketBase record id),
+        // not the human-readable PIN, matching how network.js queries it.
+        // NOTE: this clears the LIVE per-room roster only — it does not
+        // touch the students' permanent `players` accounts/progress,
+        // which is what "restart the session" should mean here.
+        const roomId = appStore.get('roomRecordId');
+        if (roomId && window.pb) {
+            try {
+                const roster = await window.pb.collection('students').getFullList({ filter: `room="${roomId}"` });
+                await Promise.allSettled(roster.map(r => window.pb.collection('students').delete(r.id)));
+            } catch (err) {
+                console.error("Failed to clear room roster:", err);
+            }
         }
         
         const currentModText = document.getElementById('prof-current-module');
@@ -101,16 +120,32 @@ export const adminUI = {
     },
     
     switchTab(tab) {
-        ['admin-tab-lobby', 'admin-tab-analytics', 'admin-tab-settings'].forEach(id => document.getElementById(id).classList.add('hidden'));
-        ['tab-lobby', 'tab-analytics', 'tab-settings'].forEach(id => { 
-            document.getElementById(id).classList.replace('border-b-2', 'hover:text-indigo-600'); 
-            document.getElementById(id).classList.replace('border-indigo-600', 'border-transparent'); 
-            document.getElementById(id).classList.replace('text-indigo-600', 'text-slate-500'); 
+        // 🔥 FIX: none of these 8 getElementById calls were null-checked —
+        // this is a high-traffic function (every nav click, plus called
+        // internally from exitToLobby() and network.js's hostStartGame())
+        // and a single missing element used to throw and abort the whole
+        // tab switch.
+        ['admin-tab-lobby', 'admin-tab-analytics', 'admin-tab-settings'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+        ['tab-lobby', 'tab-analytics', 'tab-settings'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.replace('border-b-2', 'hover:text-indigo-600'); 
+            el.classList.replace('border-indigo-600', 'border-transparent'); 
+            el.classList.replace('text-indigo-600', 'text-slate-500'); 
         });
         
-        document.getElementById(`admin-tab-${tab}`).classList.remove('hidden'); 
-        document.getElementById(`tab-${tab}`).classList.remove('text-slate-500', 'hover:text-indigo-600'); 
-        document.getElementById(`tab-${tab}`).classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+        const activePanel = document.getElementById(`admin-tab-${tab}`);
+        if (activePanel) activePanel.classList.remove('hidden');
+
+        const activeTabBtn = document.getElementById(`tab-${tab}`);
+        if (activeTabBtn) {
+            activeTabBtn.classList.remove('text-slate-500', 'hover:text-indigo-600'); 
+            activeTabBtn.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+        }
+
         if(tab === 'analytics') this.renderChart();
     },
     
@@ -150,32 +185,12 @@ export const adminUI = {
         reader.readAsDataURL(file);
     },
 
-    compressBackgroundImage(file, callback) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 1200; 
-                let width = img.width;
-                let height = img.height;
-                
-                if (width > MAX_WIDTH) {
-                    height = Math.round(height * (MAX_WIDTH / width));
-                    width = MAX_WIDTH;
-                }
-                
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                callback(canvas.toDataURL('image/jpeg', 0.8)); 
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    },
-
+    // 🔥 FIX (dead code): `compressBackgroundImage` was defined TWICE in
+    // this object literal — the second definition silently overwrote the
+    // first (a JS object literal keeps only the last key of a given
+    // name). The first version (MAX_WIDTH 1200, quality 0.8) below was
+    // 100% unreachable dead code; only the second one below it ("Aggressive
+    // Background Compressor") ever actually ran. Removed the dead copy.
     // Aggressive Background Compressor to stop localStorage crashes
     compressBackgroundImage(file, callback) {
         const reader = new FileReader();
@@ -297,51 +312,88 @@ export const adminUI = {
 
         if (!currEmail || !currPass) return window.toast("Current Email and Password are required to make changes.", false);
 
+        // 🔥 FIX: full migration from Firebase Auth's reauthenticate/
+        // updateEmail/updatePassword dance to PocketBase.
+        //
+        // SIMPLIFICATION: Firebase requires a separate
+        // reauthenticateWithCredential() step before sensitive changes.
+        // PocketBase folds that into the update call itself — sending
+        // `oldPassword` alongside a `password`/`passwordConfirm` change is
+        // itself the re-authentication check, so no separate step is
+        // needed here.
         try {
-            const user = window.firebaseAuth.currentUser;
-            if (!user) throw new Error("No professor is currently logged in.");
+            const uid = window.pb?.authStore?.model?.id;
+            if (!uid) throw new Error("No professor is currently logged in.");
 
-            import("https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js").then(async ({ EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword }) => {
-                
-                try {
-                    const credential = EmailAuthProvider.credential(currEmail, currPass);
-                    await reauthenticateWithCredential(user, credential);
-                } catch(e) {
-                    throw new Error("Invalid current email or password.");
-                }
+            // Verify the current password is actually correct before
+            // changing anything, by attempting a fresh login with it —
+            // PocketBase has no standalone "verify password" call, so a
+            // real auth attempt is the equivalent check.
+            try {
+                await window.pb.collection('users').authWithPassword(currEmail, currPass);
+            } catch (e) {
+                throw new Error("Invalid current email or password.");
+            }
 
-                if (newAvatar) localStorage.setItem('profAvatar', newAvatar);
-                
-                if (newEmail) await updateEmail(user, newEmail);
-                if (newPass) {
-                    if (newPass.length < 6) throw new Error("Password must be at least 6 characters.");
-                    await updatePassword(user, newPass);
-                }
-                
-                const finalEmail = newEmail || currEmail;
-                const uid = appStore.get('currentProfId') || user.uid;
-                const finalName = newUsernameInput || appStore.get('profName') || finalEmail.split('@')[0];
-                
-                await window.firebaseSet(window.firebaseRef(window.firebaseDB, `professorsList/${uid}`), { 
-                    email: finalEmail, 
-                    name: finalName,
-                    status: 'approved' 
+            if (newAvatar) localStorage.setItem('profAvatar', newAvatar);
+
+            if (newPass) {
+                if (newPass.length < 6) throw new Error("Password must be at least 6 characters.");
+                await window.pb.collection('users').update(uid, {
+                    oldPassword: currPass,
+                    password: newPass,
+                    passwordConfirm: newPass
                 });
+            }
 
-                appStore.set('profName', finalName);
-                if (window.uiManager) window.uiManager.updateProfHUD();
+            // 🔥 NOTE: email changes go through PocketBase's
+            // requestEmailChange() flow rather than a direct field update —
+            // this sends a confirmation link to the NEW address, which
+            // must be clicked to finalize the change. This is PocketBase's
+            // standard secure flow (avoids silently handing account access
+            // to an unverified address) and is a deliberate choice, not an
+            // oversight — flag it to the professor via the toast below
+            // rather than pretending the email changed immediately.
+            let emailChangeRequested = false;
+            if (newEmail && newEmail !== currEmail) {
+                await window.pb.collection('users').requestEmailChange(newEmail);
+                emailChangeRequested = true;
+            }
 
-                window.toast("Credentials updated successfully!", true);
-                
-                document.getElementById('current-prof-email').value = '';
-                document.getElementById('current-prof-pass').value = '';
-                document.getElementById('new-prof-user').value = '';
-                document.getElementById('new-prof-email').value = '';
-                document.getElementById('new-prof-pass').value = '';
+            // 🔥 FIX: was writing to a Firebase RTDB path
+            // (`professorsList/${uid}`). The real professor profile lives
+            // in the `players` collection (see auth.js), keyed by its own
+            // record id — not the auth user's id — so it needs to be
+            // looked up via the `user` relation first.
+            const finalName = newUsernameInput || appStore.get('profName') || currEmail.split('@')[0];
+            try {
+                const playerRecord = await window.pb.collection('players').getFirstListItem(`user="${uid}"`);
+                await window.pb.collection('players').update(playerRecord.id, { nickname: finalName });
+            } catch (profileErr) {
+                console.error("Could not update professor profile record:", profileErr);
+            }
 
-            }).catch(err => {
-                window.toast(`Update failed: ${err.message}`, false);
-            });
+            appStore.set('profName', finalName);
+            if (window.uiManager) window.uiManager.updateProfHUD();
+
+            window.toast(
+                emailChangeRequested
+                    ? "Credentials updated! Check your NEW email inbox to confirm the address change."
+                    : "Credentials updated successfully!",
+                true
+            );
+
+            const currEmailEl = document.getElementById('current-prof-email');
+            if (currEmailEl) currEmailEl.value = '';
+            const currPassEl = document.getElementById('current-prof-pass');
+            if (currPassEl) currPassEl.value = '';
+            const newUserEl = document.getElementById('new-prof-user');
+            if (newUserEl) newUserEl.value = '';
+            const newEmailEl = document.getElementById('new-prof-email');
+            if (newEmailEl) newEmailEl.value = '';
+            const newPassEl = document.getElementById('new-prof-pass');
+            if (newPassEl) newPassEl.value = '';
+
         } catch (error) {
             window.toast(`Update failed: ${error.message}`, false);
         }
@@ -352,37 +404,32 @@ export const adminUI = {
         const wrapper = document.getElementById('pending-professors-wrapper');
         
         try {
-            if (window.firebaseRef && window.firebaseGet && window.firebaseDB) {
-                const profsRef = window.firebaseRef(window.firebaseDB, 'professorsList');
-                const snapshot = await window.firebaseGet(profsRef);
+            // 🔥 FIX: was scanning a Firebase RTDB `professorsList` path.
+            // Professor profiles live in the `players` collection (role:
+            // 'professor') per auth.js — query that directly instead.
+            if (window.pb) {
+                const pending = await window.pb.collection('players').getFullList({
+                    filter: 'role="professor" && status="pending"'
+                });
 
-                if (snapshot.exists()) {
-                    const professors = snapshot.val();
-                    let pendingCount = 0;
-                    if (container) container.innerHTML = '';
-
-                    for (let id in professors) {
-                        const prof = professors[id];
-                        if (prof.status === 'pending') {
-                            pendingCount++;
-                            if (container) {
-                                container.innerHTML += `
-                                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border border-amber-200 dark:border-amber-500/30 rounded-xl bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-3 transition-all">
-                                    <div class="flex-1">
-                                        <p class="font-bold text-slate-800 dark:text-slate-200">${prof.name || 'Professor'}</p>
-                                        <span class="text-xs font-mono text-slate-500">${prof.email || id}</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button onclick="adminUI.approveProfessor('${id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Approve</button>
-                                        <button onclick="adminUI.denyProfessor('${id}')" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Deny</button>
-                                    </div>
-                                </div>`;
-                            }
-                        }
-                    }
-
-                    if (wrapper) wrapper.classList.toggle('hidden', pendingCount === 0);
+                // 🔥 FIX: was `container.innerHTML += ...` inside the loop
+                // — same rebuild-everything-every-iteration anti-pattern
+                // fixed elsewhere in this codebase. Build once, assign once.
+                if (container) {
+                    container.innerHTML = pending.map(prof => `
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border border-amber-200 dark:border-amber-500/30 rounded-xl bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-3 transition-all">
+                            <div class="flex-1">
+                                <p class="font-bold text-slate-800 dark:text-slate-200">${prof.nickname || 'Professor'}</p>
+                                <span class="text-xs font-mono text-slate-500">${prof.id}</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="adminUI.approveProfessor('${prof.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Approve</button>
+                                <button onclick="adminUI.denyProfessor('${prof.id}')" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Deny</button>
+                            </div>
+                        </div>`).join('');
                 }
+
+                if (wrapper) wrapper.classList.toggle('hidden', pending.length === 0);
             }
         } catch (e) {
             console.error("Failed to fetch pending professors", e);
@@ -390,10 +437,12 @@ export const adminUI = {
     },
 
     async approveProfessor(profId) {
+        // 🔥 FIX: `profId` here is the `players` collection record id
+        // (see fetchPendingProfessors above) — was a Firebase RTDB status
+        // write, now a direct PocketBase field update.
         try {
-            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
-                const statusRef = window.firebaseRef(window.firebaseDB, `professorsList/${profId}/status`);
-                await window.firebaseSet(statusRef, 'approved');
+            if (window.pb) {
+                await window.pb.collection('players').update(profId, { status: 'approved' });
                 window.toast("Professor approved successfully!", true);
                 this.fetchPendingProfessors();
             }
@@ -405,9 +454,21 @@ export const adminUI = {
     async denyProfessor(profId) {
         if (!confirm("Are you sure you want to deny this professor account request?")) return;
         try {
-            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
-                const profRef = window.firebaseRef(window.firebaseDB, `professorsList/${profId}`);
-                await window.firebaseSet(profRef, null);
+            if (window.pb) {
+                // 🔥 FIX: was a Firebase RTDB delete. Also deletes the
+                // associated `users` auth record (fetched via the
+                // player's `user` relation first) — a denied application
+                // shouldn't leave behind a login-capable account. If your
+                // intended policy is to keep the auth account around for
+                // a possible future re-application, drop the `users`
+                // delete call below and keep only the `players` delete.
+                const profRecord = await window.pb.collection('players').getOne(profId);
+                await window.pb.collection('players').delete(profId);
+                if (profRecord.user) {
+                    try { await window.pb.collection('users').delete(profRecord.user); } catch (e) {
+                        console.warn("Could not delete associated auth user for denied professor:", e);
+                    }
+                }
                 window.toast("Professor request denied and removed.", true);
                 this.fetchPendingProfessors();
             }
@@ -475,186 +536,235 @@ export const adminUI = {
         this.renderTeams(); this.renderStudentManagement();
     },
 
+    // 🔥🔥🔥 CRITICAL FINDING — read this before anything else in this
+    // section 🔥🔥🔥
+    // Every function below (manualRegisterStudent, giftItem,
+    // renderStudentManagement, approveStudent, deleteStudent,
+    // saveStudentEdit) used to read and write student data via
+    // `authManager.getDB('students')` / `saveDB(..., 'students')` — which
+    // is a SINGLE JSON BLOB stored in the `gamedata` collection (see
+    // auth.js), keyed by phone number inside that one blob.
+    //
+    // That is a COMPLETELY SEPARATE, DISCONNECTED data store from the
+    // `players` collection that auth.js's real registerStudent()/
+    // loginStudent(), network.js, GameController.js, ShopController.js,
+    // and LifelineController.js all actually use for login and gameplay.
+    // Concretely, this meant: a student who self-registered through the
+    // normal login screen (a real `players` row) would NEVER show up
+    // here. A student "approved" by a professor in this panel had their
+    // STATUS FLIPPED ONLY IN THE GAMEDATA BLOB — their real `players`
+    // row (the one loginStudent() actually checks) would still say
+    // "pending" and they'd remain locked out, with the professor's UI
+    // wrongly showing them as approved.
+    //
+    // Every function below has been migrated to read/write the REAL
+    // `players` collection instead, scoped by `professorId` to preserve
+    // the tenant isolation the gamedata-blob approach used to provide.
+    // This is the single most impactful fix in this batch.
+
     async manualRegisterStudent() {
-        const name = document.getElementById('manual-student-name').value.trim();
-        const cc = document.getElementById('manual-student-cc').value;
-        const rawPhone = document.getElementById('manual-student-phone').value;
-        const cleanPhone = String(rawPhone).replace(/\D/g, '');
-        const pass = document.getElementById('manual-student-pass').value.trim();
-        const selectedTeam = document.getElementById('manual-student-team').value;
+        const nameEl = document.getElementById('manual-student-name');
+        const ccEl = document.getElementById('manual-student-cc');
+        const phoneEl = document.getElementById('manual-student-phone');
+        const passEl = document.getElementById('manual-student-pass');
+        const teamEl = document.getElementById('manual-student-team');
+        if (!nameEl || !ccEl || !phoneEl || !passEl || !teamEl) return;
+
+        const name = nameEl.value.trim();
+        const cc = ccEl.value;
+        const cleanPhone = String(phoneEl.value).replace(/\D/g, '');
+        const pass = passEl.value.trim();
+        const selectedTeam = teamEl.value;
         const avatarEl = document.getElementById('manual-student-avatar-preview');
         let avatar = avatarEl ? avatarEl.dataset.newavatar : null;
 
         if (!name || !cleanPhone || !pass) return window.toast("Name, Phone, and Password are required.", false);
         if (!/^\d{8,15}$/.test(cleanPhone)) return window.toast("Please enter a valid numeric phone number.", false);
-        
+
         const phone = cc + cleanPhone;
+        const profId = appStore.get('currentProfId');
         const shadowEmail = `${phone}_${Date.now()}@student.app.com`;
         const teams = appStore.get('teams') || [{id: 'eagle'}];
         const finalTeam = selectedTeam === 'random' ? teams[0].id : selectedTeam;
-        if (!avatar) avatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-        
+        if (!avatar) avatar = DEFAULT_AVATAR;
+
+        // Same duplicate-registration guard added to auth.js's
+        // registerStudent() in an earlier batch — prevents a professor
+        // from accidentally creating two accounts for the same phone.
         try {
-            import("https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js").then(async ({ initializeApp }) => {
-                import("https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js").then(async ({ getAuth, createUserWithEmailAndPassword, signOut }) => {
-                    const adminApp = initializeApp(window.firebaseDB.app.options, "AdminAppInstance");
-                    const adminAuth = getAuth(adminApp);
-                    
-                    const userCredential = await createUserWithEmailAndPassword(adminAuth, shadowEmail, pass);
-                    await signOut(adminAuth);
+            await window.pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
+            return window.toast("A student with this phone number already exists for your class.", false);
+        } catch (err) {
+            if (err?.status !== 404) return window.toast(`Registration failed: ${err.message}`, false);
+        }
 
-                    const studentData = { uid: userCredential.user.uid, name: name, avatar, team: finalTeam, shadowEmail, status: 'approved' }; 
-                    await authManager.saveDB(studentData, `students/${phone}`);
-
-                    window.toast(`Successfully registered ${name}!`, true);
-                    
-                    document.getElementById('manual-student-name').value = '';
-                    document.getElementById('manual-student-phone').value = '';
-                    document.getElementById('manual-student-pass').value = '';
-                    
-                    if(avatarEl) {
-                        avatarEl.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-                        delete avatarEl.dataset.newavatar;
-                    }
-                    
-                    this.renderStudentManagement();
-                });
+        // 🔥 SIMPLIFICATION: the old Firebase version had to spin up a
+        // SEPARATE secondary Firebase app instance ("AdminAppInstance")
+        // purely to create the student's auth account without kicking
+        // the professor out of their own session — Firebase's client SDK
+        // auto-signs-in as any user you create with it. PocketBase's
+        // `.create()` does NOT touch `pb.authStore` at all — it's a plain
+        // REST create — so that whole workaround is unnecessary here.
+        let userRecord;
+        try {
+            userRecord = await window.pb.collection('users').create({
+                email: shadowEmail, password: pass, passwordConfirm: pass, name
             });
-        } catch (error) { window.toast(`Registration failed: ${error.message}`, false); }
+        } catch (error) {
+            return window.toast(`Registration failed: ${error.message}`, false);
+        }
+
+        try {
+            await window.pb.collection('players').create({
+                user: userRecord.id, nickname: name, avatar, team: finalTeam,
+                shadowEmail, phone, professorId: profId, role: 'student',
+                status: 'approved' // professor-added students don't need self-approval
+            });
+        } catch (profileErr) {
+            console.error("Failed to create student profile, rolling back user record:", profileErr);
+            try { await window.pb.collection('users').delete(userRecord.id); } catch (e) { /* best-effort */ }
+            return window.toast(`Registration failed: ${profileErr.message}`, false);
+        }
+
+        window.toast(`Successfully registered ${name}!`, true);
+        nameEl.value = ''; phoneEl.value = ''; passEl.value = '';
+
+        if(avatarEl) {
+            avatarEl.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E`;
+            delete avatarEl.dataset.newavatar;
+        }
+
+        this.renderStudentManagement();
     },
 
     async giftItem(phone) {
         const giftSelect = document.getElementById(`gift-item-${phone}`);
+        if (!giftSelect) return;
         const item = giftSelect.value;
         if (!item) return window.toast("Please select an item to gift first.", false);
-        
-        const db = await authManager.getDB('students');
-        const student = db[phone];
-        
-        if (!student) return window.toast("Student not found in database.", false);
 
-        if (student.uid && window.firebaseRef && window.firebaseSet && window.firebaseDB && window.firebaseGet) {
-            try {
-                const userRef = window.firebaseRef(window.firebaseDB, `users/${student.uid}`);
-                const snapshot = await window.firebaseGet(userRef);
-                
-                if (snapshot.exists()) {
-                    let globalData = snapshot.val();
-                    if (item === 'coins_50') {
-                        globalData.coins = (globalData.coins || 0) + 50;
-                    } else {
-                        globalData.inventory = globalData.inventory || {};
-                        globalData.inventory[item] = (globalData.inventory[item] || 0) + 1;
-                    }
-                    await window.firebaseSet(userRef, globalData);
-                    window.toast(`Gift sent directly to ${student.name}'s live account!`, true);
-                    giftSelect.selectedIndex = 0; 
-                } else {
-                    window.toast("Student profile not fully generated. Have them log in first.", false);
-                }
-            } catch(e) {
-                console.error("Gifting sync failed", e);
-                window.toast("Failed to connect to Firebase for live gifting.", false);
+        try {
+            // 🔥 FIX: was reading/writing a `users/${uid}` Firebase path
+            // sourced from the disconnected gamedata-blob student record.
+            // Looks up the REAL `players` row instead, scoped to this
+            // professor.
+            const profId = appStore.get('currentProfId');
+            const student = await window.pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
+
+            const fields = {};
+            if (item === 'coins_50') {
+                fields.coins = (student.coins || 0) + 50;
+            } else {
+                const inventory = { ...(student.inventory || {}) };
+                inventory[item] = (inventory[item] || 0) + 1;
+                fields.inventory = inventory;
             }
-        } else {
-            window.toast("Missing student UID for live gifting.", false);
+
+            await window.pb.collection('players').update(student.id, fields);
+            window.toast(`Gift sent directly to ${student.nickname}'s live account!`, true);
+            giftSelect.selectedIndex = 0;
+        } catch (e) {
+            console.error("Gifting sync failed", e);
+            window.toast(e?.status === 404 ? "Student not found." : "Failed to send gift — check your connection.", false);
         }
     },
 
     renderStudentManagement() {
-        const dbPromise = authManager.getDB('students'); 
         const pendingContainer = document.getElementById('pending-approvals-list');
         const container = document.getElementById('student-management-list'); 
+        const profId = appStore.get('currentProfId');
         
-        dbPromise.then(database => {
-            if(pendingContainer) pendingContainer.innerHTML = '';
-            if(container) container.innerHTML = '';
-            
+        // 🔥 FIX: was `authManager.getDB('students')` (the disconnected
+        // gamedata blob) — now queries the REAL `players` collection,
+        // scoped to this professor via `professorId` to preserve the
+        // same tenant isolation the old approach provided.
+        window.pb.collection('players').getFullList({ filter: `professorId="${profId}" && role="student"` }).then(students => {
             const teams = appStore.get('teams') || [];
-            let pendingCount = 0;
+            const pending = students.filter(s => s.status === 'pending');
+            const active = students.filter(s => s.status !== 'pending');
 
-            for(let phone in database) {
-                const s = database[phone];
-                
-                if (s.status === 'pending') {
-                    pendingCount++;
-                    if(pendingContainer) {
-                        pendingContainer.innerHTML += `
-                        <div class="flex flex-col sm:flex-row items-center gap-4 p-4 border border-amber-200 dark:border-amber-500/30 rounded-xl bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-3 transition-all">
-                            <img src="${s.avatar}" class="w-12 h-12 rounded-full object-cover border border-amber-300">
-                            <div class="flex-1">
-                                <p class="font-bold text-slate-800 dark:text-slate-200">${s.name}</p>
-                                <span class="text-xs font-mono text-slate-500">${phone}</span>
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick="adminUI.approveStudent('${phone}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Approve</button>
-                                <button onclick="adminUI.deleteStudent('${phone}', true)" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Deny</button>
-                            </div>
-                        </div>`;
-                    }
-                } else {
-                    if(container) {
-                        container.innerHTML += `
-                        <div class="flex flex-col sm:flex-row items-start gap-4 p-4 border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-slate-800/80 shadow-sm mb-3 transition-all">
-                            
-                            <div class="relative w-16 h-16 shrink-0 transition-transform hover:scale-105">
-                                <img src="${s.avatar}" id="edit-img-${phone}" class="w-full h-full rounded-full object-cover border border-slate-300">
-                                <input type="file" accept="image/*" onchange="adminUI.updateStudentAvatar(event, '${phone}')" class="absolute inset-0 opacity-0 cursor-pointer" title="Update Profile Photo">
-                            </div>
-                            
-                            <div class="flex-1 w-full flex flex-col gap-1">
-                                <div class="flex justify-between items-start">
-                                    <p class="font-bold text-slate-800 dark:text-white text-lg">${s.name}</p>
-                                    <span class="phone-badge text-xs font-mono px-2 py-1 rounded-md">${phone}</span>
-                                </div>
-                                
-                                <div class="flex gap-4 mt-2">
-                                    <div class="flex-1">
-                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">New Password</label>
-                                        <input type="text" id="edit-pass-${phone}" placeholder="Reset Password..." class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded-lg w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white transition-colors">
-                                    </div>
-                                    <div class="flex-1">
-                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Assign Team</label>
-                                        <select id="edit-team-${phone}" class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded-lg w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white transition-colors">
-                                            ${teams.map(t => `<option value="${t.id}" ${s.team === t.id ? 'selected' : ''}>${this.getTeamDetails(t.id).name}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                </div>
+            // 🔥 FIX: both lists were built with `innerHTML += ...` inside
+            // a loop — same anti-pattern fixed elsewhere. Build once,
+            // assign once. Also fixes the avatar path bug: `s.avatar` is a
+            // bare filename and needs getAvatarUrl() + an onerror fallback,
+            // same as everywhere else this is rendered.
+            if (pendingContainer) {
+                pendingContainer.innerHTML = pending.map(s => `
+                    <div class="flex flex-col sm:flex-row items-center gap-4 p-4 border border-amber-200 dark:border-amber-500/30 rounded-xl bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-3 transition-all">
+                        <img src="${getAvatarUrl(s.avatar)}" onerror="${AVATAR_ONERROR}" class="w-12 h-12 rounded-full object-cover border border-amber-300">
+                        <div class="flex-1">
+                            <p class="font-bold text-slate-800 dark:text-slate-200">${s.nickname}</p>
+                            <span class="text-xs font-mono text-slate-500">${s.phone}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="adminUI.approveStudent('${s.phone}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Approve</button>
+                            <button onclick="adminUI.deleteStudent('${s.phone}', true)" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Deny</button>
+                        </div>
+                    </div>`).join('');
+            }
 
-                                <div class="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-white/10 w-full">
-                                    <select id="gift-item-${phone}" class="flex-1 p-2 text-sm rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-200 focus:outline-none transition-colors">
-                                        <option value="" disabled selected>Select a Gift...</option>
-                                        <option value="extraLife">&#128305; Extra Life</option>
-                                        <option value="freezeTime">&#10052; Time Freeze</option>
-                                        <option value="timeBurn">&#128293; Time Burn</option>
-                                        <option value="doubleCoins">&#129689; Double Coins</option>
-                                        <option value="coins_50">&#128176; +50 Coins immediately</option>
+            if (container) {
+                container.innerHTML = active.map(s => `
+                    <div class="flex flex-col sm:flex-row items-start gap-4 p-4 border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-slate-800/80 shadow-sm mb-3 transition-all">
+                        
+                        <div class="relative w-16 h-16 shrink-0 transition-transform hover:scale-105">
+                            <img src="${getAvatarUrl(s.avatar)}" onerror="${AVATAR_ONERROR}" id="edit-img-${s.phone}" class="w-full h-full rounded-full object-cover border border-slate-300">
+                            <input type="file" accept="image/*" onchange="adminUI.updateStudentAvatar(event, '${s.phone}')" class="absolute inset-0 opacity-0 cursor-pointer" title="Update Profile Photo">
+                        </div>
+                        
+                        <div class="flex-1 w-full flex flex-col gap-1">
+                            <div class="flex justify-between items-start">
+                                <p class="font-bold text-slate-800 dark:text-white text-lg">${s.nickname}</p>
+                                <span class="phone-badge text-xs font-mono px-2 py-1 rounded-md">${s.phone}</span>
+                            </div>
+                            
+                            <div class="flex gap-4 mt-2">
+                                <div class="flex-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">New Password</label>
+                                    <input type="text" id="edit-pass-${s.phone}" placeholder="Reset Password..." class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded-lg w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white transition-colors">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Assign Team</label>
+                                    <select id="edit-team-${s.phone}" class="border border-slate-300 dark:border-white/20 p-2 text-sm rounded-lg w-full bg-white dark:bg-black/30 text-slate-900 dark:text-white transition-colors">
+                                        ${teams.map(t => `<option value="${t.id}" ${s.team === t.id ? 'selected' : ''}>${this.getTeamDetails(t.id).name}</option>`).join('')}
                                     </select>
-                                    <button onclick="adminUI.giftItem('${phone}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors w-full sm:w-auto">&#127873; Send Gift</button>
                                 </div>
                             </div>
-                            
-                            <div class="flex flex-col gap-2 w-full sm:w-auto mt-3 sm:mt-0">
-                                <button onclick="adminUI.saveStudentEdit('${phone}')" class="w-full bg-slate-800 hover:bg-slate-900 dark:bg-white/10 dark:hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">Save Edits</button>
-                                <button onclick="adminUI.deleteStudent('${phone}', false)" class="w-full bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">Delete</button>
+
+                            <div class="flex flex-col sm:flex-row gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-white/10 w-full">
+                                <select id="gift-item-${s.phone}" class="flex-1 p-2 text-sm rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-200 focus:outline-none transition-colors">
+                                    <option value="" disabled selected>Select a Gift...</option>
+                                    <option value="extraLife">&#128305; Extra Life</option>
+                                    <option value="freezeTime">&#10052; Time Freeze</option>
+                                    <option value="timeBurn">&#128293; Time Burn</option>
+                                    <option value="doubleCoins">&#129689; Double Coins</option>
+                                    <option value="coins_50">&#128176; +50 Coins immediately</option>
+                                </select>
+                                <button onclick="adminUI.giftItem('${s.phone}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors w-full sm:w-auto">&#127873; Send Gift</button>
                             </div>
-                        </div>`;
-                    }
-                }
+                        </div>
+                        
+                        <div class="flex flex-col gap-2 w-full sm:w-auto mt-3 sm:mt-0">
+                            <button onclick="adminUI.saveStudentEdit('${s.phone}')" class="w-full bg-slate-800 hover:bg-slate-900 dark:bg-white/10 dark:hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">Save Edits</button>
+                            <button onclick="adminUI.deleteStudent('${s.phone}', false)" class="w-full bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">Delete</button>
+                        </div>
+                    </div>`).join('');
             }
             
             const pWrap = document.getElementById('pending-approvals-wrapper');
-            if(pWrap) pWrap.classList.toggle('hidden', pendingCount === 0);
-        }).catch(e => console.warn("No student DB yet", e));
+            if(pWrap) pWrap.classList.toggle('hidden', pending.length === 0);
+        }).catch(e => console.warn("Failed to load student roster", e));
     },
 
     async approveStudent(phone) {
-        const db = await authManager.getDB('students');
-        if (db[phone]) {
-            db[phone].status = 'approved';
-            await authManager.saveDB(db, 'students');
+        try {
+            const profId = appStore.get('currentProfId');
+            const student = await window.pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
+            await window.pb.collection('players').update(student.id, { status: 'approved' });
             window.toast("Student approved!", true);
             this.renderStudentManagement();
+        } catch (err) {
+            window.toast("Could not approve student — check your connection.", false);
         }
     },
     
@@ -663,9 +773,17 @@ export const adminUI = {
         
         try {
             const profId = appStore.get('currentProfId');
-            if (window.firebaseRef && window.firebaseSet) {
-                const dbRef = window.firebaseRef(window.firebaseDB, `professors/${profId}/students/${phone}`);
-                await window.firebaseSet(dbRef, null);
+            // 🔥 FIX: was deleting a Firebase RTDB path built from a
+            // profId/phone combo that never matched anything the rest of
+            // the app reads. Deletes the real `players` row (and its
+            // `users` auth record, so the student can't still log in
+            // after being removed) instead.
+            const student = await window.pb.collection('players').getFirstListItem(`phone="${phone}" && professorId="${profId}"`);
+            await window.pb.collection('players').delete(student.id);
+            if (student.user) {
+                try { await window.pb.collection('users').delete(student.user); } catch (e) {
+                    console.warn("Could not delete associated auth user:", e);
+                }
             }
             
             const players = appStore.get('players') || {};
@@ -677,10 +795,14 @@ export const adminUI = {
                 this.updateLobbyList();
                 this.updateTeamScores();
                 
-                const pin = appStore.get('roomCode');
-                if (pin && window.firebaseRef && window.firebaseSet) {
-                    const studentRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students/${phone}`);
-                    await window.firebaseSet(studentRef, null);
+                // Also remove them from the live room roster if a room is
+                // currently active (network.js's `students` collection).
+                const roomId = appStore.get('roomRecordId');
+                if (roomId) {
+                    try {
+                        const roomEntry = await window.pb.collection('students').getFirstListItem(`room="${roomId}" && phone="${phone}"`);
+                        await window.pb.collection('students').delete(roomEntry.id);
+                    } catch (e) { /* not currently in an active room — fine */ }
                 }
             }
             
@@ -690,37 +812,70 @@ export const adminUI = {
     },
     
     async saveStudentEdit(oldPhone) {
-        const db = await authManager.getDB('students'); 
-        const newPass = document.getElementById(`edit-pass-${oldPhone}`).value.trim(); 
-        const newTeam = document.getElementById(`edit-team-${oldPhone}`).value;
-        const newAvatar = document.getElementById(`edit-img-${oldPhone}`).dataset.newavatar;
-        
-        const studentData = db[oldPhone];
-        studentData.team = newTeam;
-        if (newAvatar) studentData.avatar = newAvatar;
-        if (newPass) studentData.pass = newPass;
+        const passEl = document.getElementById(`edit-pass-${oldPhone}`);
+        const teamEl = document.getElementById(`edit-team-${oldPhone}`);
+        const imgEl = document.getElementById(`edit-img-${oldPhone}`);
+        if (!passEl || !teamEl || !imgEl) return;
 
-        db[oldPhone] = studentData;
-        authManager.saveDB(db, 'students'); 
-        window.toast("Student account updated!", true);
-        
-        const players = appStore.get('players') || {};
-        const peerId = Object.keys(players).find(id => players[id].phone === oldPhone);
-        
-        if (peerId) {
-            players[peerId].team = newTeam;
-            appStore.set('players', players);
-            this.updateLobbyList();
-            this.updateTeamScores();
-            
-            const pin = appStore.get('roomCode');
-            if (pin) {
-                const studentRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students/${oldPhone}`);
-                await window.firebaseSet(studentRef, players[peerId]);
+        const newPass = passEl.value.trim();
+        const newTeam = teamEl.value;
+        const newAvatar = imgEl.dataset.newavatar;
+
+        try {
+            const profId = appStore.get('currentProfId');
+            const student = await window.pb.collection('players').getFirstListItem(`phone="${oldPhone}" && professorId="${profId}"`);
+
+            const fields = { team: newTeam };
+            if (newAvatar) fields.avatar = newAvatar;
+            await window.pb.collection('players').update(student.id, fields);
+
+            // 🔥 NOTE: password resets for OTHER users generally require
+            // superuser/admin-level PocketBase access — the public client
+            // SDK can't normally change another account's password
+            // without their current one. If this call fails with a
+            // permissions error, you likely need either a PocketBase
+            // superuser token on the server side or a custom API route
+            // for this action, rather than calling it from the browser
+            // with the professor's own session.
+            if (newPass) {
+                if (newPass.length < 6) {
+                    window.toast("Team/avatar saved, but password needs 6+ characters — not changed.", false);
+                } else if (student.user) {
+                    try {
+                        await window.pb.collection('users').update(student.user, {
+                            password: newPass, passwordConfirm: newPass
+                        });
+                    } catch (passErr) {
+                        console.error("Password reset failed (likely needs superuser access):", passErr);
+                        window.toast("Team/avatar saved, but password reset failed — see console.", false);
+                    }
+                }
             }
-        }
 
-        this.renderStudentManagement(); 
+            window.toast("Student account updated!", true);
+            
+            const players = appStore.get('players') || {};
+            const peerId = Object.keys(players).find(id => players[id].phone === oldPhone);
+            
+            if (peerId) {
+                players[peerId].team = newTeam;
+                appStore.set('players', players);
+                this.updateLobbyList();
+                this.updateTeamScores();
+
+                const roomId = appStore.get('roomRecordId');
+                if (roomId) {
+                    try {
+                        const roomEntry = await window.pb.collection('students').getFirstListItem(`room="${roomId}" && phone="${oldPhone}"`);
+                        await window.pb.collection('students').update(roomEntry.id, { team: newTeam });
+                    } catch (e) { /* not currently in an active room — fine */ }
+                }
+            }
+
+            this.renderStudentManagement(); 
+        } catch (err) {
+            window.toast("Error saving student edits — check your connection.", false);
+        }
     },
 
     updateLobbyList() {
@@ -741,15 +896,19 @@ export const adminUI = {
 
         const sortedPlayers = Object.values(players).sort((a, b) => (b.scores?.total || 0) - (a.scores?.total || 0));
 
-        sortedPlayers.forEach(p => { 
+        // 🔥 FIX: was `list.innerHTML += ...` inside forEach — same
+        // rebuild-every-iteration anti-pattern fixed elsewhere. Also
+        // fixes the avatar path bug: `p.avatar` is a bare filename and
+        // needs getAvatarUrl() + an onerror fallback.
+        list.innerHTML = sortedPlayers.map(p => {
             const theme = this.getTeamDetails(p.team);
             const badgeColor = tailwindColors[theme.color]?.bg || 'bg-indigo-500';
             const score = p.scores?.total || 0;
             
-            list.innerHTML += `
+            return `
                 <li class="flex items-center justify-between p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-white/10 mb-2 shadow-sm transition-all text-slate-800 dark:text-slate-100">
                     <div class="flex items-center gap-3">
-                        <img src="${p.avatar}" class="w-10 h-10 rounded-full border-2 ${p.border || 'border-slate-300'} bg-white dark:bg-slate-700 object-cover">
+                        <img src="${getAvatarUrl(p.avatar)}" onerror="${AVATAR_ONERROR}" class="w-10 h-10 rounded-full border-2 ${p.border || 'border-slate-300'} bg-white dark:bg-slate-700 object-cover">
                         <div class="flex flex-col">
                             <span class="font-bold text-slate-800 dark:text-white text-sm leading-tight">${p.name}</span>
                             <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">${p.phone || 'Student'}</span>
@@ -761,15 +920,20 @@ export const adminUI = {
                     </div>
                 </li>
             `;
-        });
+        }).join('');
     },
     
     updateTeamScores() {
         const sb = document.getElementById('dynamic-team-scoreboard');
         if(!sb) return;
         let html = '';
-        const teams = appStore.get('teams');
-        const players = appStore.get('players');
+        // 🔥 FIX: added `|| []`/`|| {}` fallbacks for consistency with
+        // every other appStore.get('teams')/get('players') call in this
+        // file — store.js always seeds both, so this wasn't a live crash
+        // risk today, but it's the only place in the file missing the
+        // defensive fallback used everywhere else.
+        const teams = appStore.get('teams') || [];
+        const players = appStore.get('players') || {};
 
         teams.forEach(t => {
             let score = 0;
@@ -790,19 +954,26 @@ export const adminUI = {
         sb.innerHTML = html;
     },
     
-    updateAnalytics() { if(!document.getElementById('admin-tab-analytics').classList.contains('hidden')) this.renderChart(); },
+    // 🔥 FIX: was unguarded — `updateAnalytics()` is called from
+    // network.js's real-time roster listener on every player update, so a
+    // missing `#admin-tab-analytics` element would throw on every single
+    // score change, not just once.
+    updateAnalytics() {
+        const analyticsTab = document.getElementById('admin-tab-analytics');
+        if (analyticsTab && !analyticsTab.classList.contains('hidden')) this.renderChart();
+    },
     
     renderChart() {
         const players = Object.values(appStore.get('players') || {}); 
         const l = document.getElementById('analytics-player-list'); 
         if(!l) return;
-        l.innerHTML = '';
         
-        players.sort((a,b)=>(b.scores?.total || 0) - (a.scores?.total || 0)).forEach(p => { 
+        // 🔥 FIX: same innerHTML += anti-pattern fixed elsewhere.
+        l.innerHTML = players.sort((a,b)=>(b.scores?.total || 0) - (a.scores?.total || 0)).map(p => { 
             const theme = this.getTeamDetails(p.team);
             const bgClass = tailwindColors[theme.color]?.bg || 'bg-indigo-500';
             
-            l.innerHTML += `
+            return `
             <div class="flex justify-between items-center bg-white dark:bg-slate-800/80 p-3 rounded-lg border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100 mb-2 shadow-sm transition-colors">
                 <div class="flex items-center gap-2">
                     <div class="w-3 h-3 rounded-full ${bgClass} shadow-sm"></div>
@@ -815,7 +986,7 @@ export const adminUI = {
                     <span class="font-black text-indigo-800 dark:text-indigo-300">Tot: ${p.scores?.total||0}</span>
                 </div>
             </div>`; 
-        });
+        }).join('');
         
         const ctxEl = document.getElementById('classRadarChart');
         if(ctxEl && window.Chart) {
@@ -865,6 +1036,17 @@ export const adminUI = {
     setupDrawingBoard(containerId) {
         const container = document.getElementById(containerId);
         if (!container) return;
+
+        // 🔥 FIX: `init()` (which calls this) re-runs every time a
+        // professor hosts a new room (see network.js's hostGame()) — but
+        // `#mod3-draw-container` is a persistent element inside the
+        // always-mounted ProfDashboard component, not recreated per game.
+        // Without this guard, each new hosted session stacked another set
+        // of mousedown/mousemove/mouseup/mouseleave listeners on the same
+        // element, so a single click could eventually fire N times.
+        if (container.dataset.drawingBoardInitialized) return;
+        container.dataset.drawingBoardInitialized = 'true';
+
         const layer = container.querySelector('#mod3-admin-layer');
         let isDrawing = false;
         let startX, startY, currentBox;
@@ -1146,3 +1328,16 @@ export const adminUI = {
         }
     }
 };
+
+// 🔥 FIX: this binding was missing entirely. Every button in
+// ProfDashboard.js's template uses an inline `onclick="adminUI.xyz()"`
+// handler, which resolves against the GLOBAL/window scope — without this
+// line, every single one of those buttons would throw `ReferenceError:
+// adminUI is not defined` the moment it's clicked, unless some other
+// bootstrap file not seen in this review already does this binding.
+// Every other controller reviewed so far in this series that gets called
+// from inline HTML (shopController, dashboardController, syncManager,
+// app) already self-binds this way — this makes adminUI consistent with
+// that pattern. Safe either way: if a bootstrap file also does this,
+// it's a harmless redundant assignment to the same object.
+window.adminUI = adminUI;

@@ -55,6 +55,9 @@ export class AppHeader extends HTMLElement {
                         <button onclick="app.exitToHome()" id="btn-exit-home" class="flex items-center justify-center w-10 h-10 text-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 border border-slate-200 dark:border-white/10 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="Exit to Home">⬅️</button>
                         
                         <button onclick="window.dashboardController.openDashboard()" id="btn-dashboard" class="flex items-center justify-center w-10 h-10 text-xl bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/40 border border-indigo-200 dark:border-indigo-500/30 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="My Dashboard">📊</button>
+
+                        <!-- Analytics / Progress Button -->
+                        <button onclick="window.progressController && window.progressController.openProgress()" id="btn-analytics" class="flex items-center justify-center w-10 h-10 text-xl bg-fuchsia-50 dark:bg-fuchsia-500/20 hover:bg-fuchsia-100 dark:hover:bg-fuchsia-500/40 border border-fuchsia-200 dark:border-fuchsia-500/30 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="Progress & Habits Analytics">📈</button>
                         
                         <!-- Shop Button -->
                         <button onclick="window.shopController.openShop()" id="btn-shop" class="flex items-center justify-center w-10 h-10 text-xl bg-amber-50 dark:bg-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/40 border border-amber-200 dark:border-amber-500/30 rounded-full transition-all duration-300 shadow-sm hover:-translate-y-1 active:scale-95 cursor-pointer" title="Avatar Shop">🛍️</button>

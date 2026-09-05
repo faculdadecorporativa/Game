@@ -295,13 +295,52 @@ export const app = {
     async updateStudentScore(points, skillArea) {
         const pin = appStore.get('roomCode');
         const me = appStore.get('me');
-        if (!pin || !me || !me.phone) return;
+        if (!me || !me.phone) return;
 
+        // 1. Update Core Local Scoring Data
         me.scores.total += points;
-        me.scores[skillArea] += points;
+        me.scores[skillArea] = (me.scores[skillArea] || 0) + points;
+        
+        // 2. Global Progression System (Gamification Integration)
+        me.xp = (me.xp || 0) + points;
+        me.coins = (me.coins || 0) + Math.max(1, Math.floor(points / 2)); // Dynamic coin scaling
+
+        // 3. Analytics Dashboard Data Sync
+        if (!me.skills) {
+            me.skills = { reading: 0, writing: 0, speaking: 0, interpretation: 0, participation: 0, influence: 0 };
+        }
+        
+        const lowerSkill = skillArea.toLowerCase();
+        if (me.skills[lowerSkill] !== undefined) {
+            // Cap skill percentages at 100 for the analytics UI matrix
+            me.skills[lowerSkill] = Math.min(100, me.skills[lowerSkill] + points);
+        }
+
+        // 4. Level-Up Engine
+        const nextLevelXp = (me.level || 1) * 1000;
+        if (me.xp >= nextLevelXp) {
+            me.level = (me.level || 1) + 1;
+            if (window.toast) window.toast(`🎉 Level Up! You reached Level ${me.level}!`, true);
+            if (me.id && window.firebaseRef && window.firebaseDB) {
+                window.firebaseSet(window.firebaseRef(window.firebaseDB, `users/${me.id}/level`), me.level);
+            }
+        }
+
+        // Lock state changes securely
         appStore.set('me', me);
 
-        const studentScoreRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students/${me.phone}/scores`);
-        await window.firebaseSet(studentScoreRef, me.scores);
+        // 5. Save to the Active Session Room (Updates Professor HUD and Class Leaderboard)
+        if (pin && window.firebaseRef && window.firebaseDB) {
+            const studentScoreRef = window.firebaseRef(window.firebaseDB, `rooms/${pin}/students/${me.phone}/scores`);
+            await window.firebaseSet(studentScoreRef, me.scores);
+        }
+
+        // 6. Save directly to the Global User DB (Triggers real-time StateSyncController updates everywhere)
+        if (me.id && window.firebaseRef && window.firebaseDB) {
+            window.firebaseSet(window.firebaseRef(window.firebaseDB, `users/${me.id}/scores`), me.scores);
+            window.firebaseSet(window.firebaseRef(window.firebaseDB, `users/${me.id}/xp`), me.xp);
+            window.firebaseSet(window.firebaseRef(window.firebaseDB, `users/${me.id}/coins`), me.coins);
+            window.firebaseSet(window.firebaseRef(window.firebaseDB, `users/${me.id}/skills`), me.skills);
+        }
     }
 };

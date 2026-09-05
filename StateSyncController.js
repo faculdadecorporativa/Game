@@ -51,6 +51,12 @@ export const syncManager = {
                     window.lifelineManager.renderButtons(currentMod);
                 }
             }
+
+            // 🔥 NEW: Update Progress & Analytics Dashboard instantly if it's open
+            if (window.progressController && typeof window.progressController.updateUI === 'function') {
+                window.progressController.updateUI();
+            }
+            
         } catch (err) {
             console.warn("Non-critical error during reactive UI synchronization:", err);
         }
