@@ -31,7 +31,7 @@ export const databaseJanitor = {
                         // Delete if older than 24 hours OR if it has no timestamp at all
                         if ((roomAge && roomAge > ONE_DAY_MS) || !room.createdAt) {
                             await window.firebaseSet(window.firebaseRef(window.firebaseDB, `rooms/${roomId}`), null);
-                            console.log(`%c🗑️ Deleted expired room: ${roomId}`, "color: #f59e0b;");
+                            console.log(`%c🗑️ Deleted expired room: ${roomId}`, "color: #D97706;");
                         }
                     }
                 }
@@ -58,7 +58,7 @@ export const databaseJanitor = {
                         
                         if ((studentAge && studentAge > THIRTY_DAYS_MS) || !student.lastActive) {
                             await window.firebaseSet(window.firebaseRef(window.firebaseDB, `feedbackStudentsDb/${phone}`), null);
-                            console.log(`%c🗑️ Deleted inactive legacy student: ${phone}`, "color: #f59e0b;");
+                            console.log(`%c🗑️ Deleted inactive legacy student: ${phone}`, "color: #D97706;");
                         }
                     }
                 }

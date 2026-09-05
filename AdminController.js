@@ -857,7 +857,7 @@ export const adminUI = {
         if(dCtxEl && window.Chart) {
             if(this.demoChartInstance) this.demoChartInstance.destroy(); 
             const dCtx = dCtxEl.getContext('2d');
-            this.demoChartInstance = new window.Chart(dCtx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'] }] }, options: { responsive: true } });
+            this.demoChartInstance = new window.Chart(dCtx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#3b82f6', '#10b981', '#D97706', '#ef4444', '#8b5cf6', '#64748b'] }] }, options: { responsive: true } });
         }
     },
     

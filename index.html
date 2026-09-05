@@ -130,6 +130,19 @@
             <p class="text-indigo-400 text-lg md:text-xl font-bold uppercase tracking-widest">Hold tight!</p>
         </div>
     </div>
+    
+    <!-- Add this Avatar Lightbox Modal directly above <app-header> -->
+    <div id="avatar-preview-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-[999999] flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="relative max-w-sm w-full bg-slate-900 border border-amber-500/40 rounded-2xl p-6 text-center flex flex-col items-center shadow-2xl scale-95 transition-transform duration-300" id="modal-card">
+            <button id="close-modal-btn" class="absolute top-3 right-4 text-slate-400 hover:text-white text-3xl font-bold">&times;</button>
+            <img id="preview-modal-img" src="" alt="Large Preview" class="w-48 h-48 sm:w-56 sm:h-56 object-cover rounded-full border-4 border-amber-500 shadow-[0_0_25px_rgba(217,119,6,0.3)] mb-4" />
+            <h3 id="preview-modal-name" class="text-2xl font-bold text-amber-100 mb-1"></h3>
+            <p id="preview-modal-desc" class="text-sm text-slate-300 leading-relaxed mb-4"></p>
+            <div id="preview-modal-cost" class="text-amber-400 font-bold uppercase tracking-widest text-sm bg-amber-900/40 px-4 py-2 rounded-full border border-amber-500/30"></div>
+        </div>
+    </div>
+    
+    <app-header class="relative z-20"></app-header>
 
     <app-header class="relative z-20"></app-header>
 

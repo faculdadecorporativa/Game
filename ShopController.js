@@ -3,10 +3,25 @@
 
 import { appStore } from './store.js';
 
+// 🔥 DUPLICATION NOTE: same helper as in LifelineController.js and
+// GameController.js — see the comment there recommending this be
+// extracted into one shared module.
+async function persistPlayerFields(me, fields) {
+    if (!window.pb) {
+        console.error("PocketBase client (window.pb) not found — purchase/equip not persisted.");
+        return;
+    }
+    if (!me?.playerId) {
+        console.warn("No playerId on `me` — skipping remote sync (host test session?).");
+        return;
+    }
+    await window.pb.collection('players').update(me.playerId, fields); 
+}
+
 export const shopController = {
     currentTab: 'consumables', 
-    
-    // Comprehensive Categorized Premium Catalog (Safe HTML Entities)
+    _busy: false, 
+
     catalog: {
         consumables: [
             { id: 'extraLife', name: "Extra Life", cost: 100, icon: "&#128305;", desc: "Saves you from losing your streak on a wrong answer.", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
@@ -26,24 +41,10 @@ export const shopController = {
             { id: 'titleUnstoppable', name: "Unstoppable", cost: 500, icon: "&#9732;", desc: "Exclusive, legendary title reserved for streak masters.", equipType: 'title', equipValue: 'Unstoppable', glow: "shadow-[0_0_15px_rgba(239,68,68,0.3)]" }
         ],
         avatars: [
-            { id: 'avatarAbraham', name: "Abraham", cost: 300, icon: "<img src='/avatars/abraham.png' class='w-full h-full object-cover rounded-full' />", desc: "Father of nations. A beacon of unwavering faith.", equipType: 'avatar', equipValue: "/avatars/abraham.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
-            { id: 'avatarPaul', name: "Apostle Paul", cost: 400, icon: "<img src='/avatars/apostle-paul.png' class='w-full h-full object-cover rounded-full' />", desc: "Bold messenger and author of many epistles.", equipType: 'avatar', equipValue: "/avatars/apostle-paul.png", glow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]" },
-            { id: 'avatarPeter', name: "Apostle Peter", cost: 400, icon: "<img src='/avatars/apostle-peter.png' class='w-full h-full object-cover rounded-full' />", desc: "The rock upon which the foundation was built.", equipType: 'avatar', equipValue: "/avatars/apostle-peter.png", glow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" },
-            { id: 'avatarMichael', name: "Archangel Michael", cost: 800, icon: "<img src='/avatars/archangel-michael.png' class='w-full h-full object-cover rounded-full' />", desc: "Mighty defender and leader of the heavenly host.", equipType: 'avatar', equipValue: "/avatars/archangel-michael.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
-            { id: 'avatarDaniel', name: "Daniel", cost: 500, icon: "<img src='/avatars/daniel.png' class='w-full h-full object-cover rounded-full' />", desc: "Unshakable integrity, even in the lions' den.", equipType: 'avatar', equipValue: "/avatars/daniel.png", glow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]" },
-            { id: 'avatarElijah', name: "Elijah", cost: 600, icon: "<img src='/avatars/elijah.png' class='w-full h-full object-cover rounded-full' />", desc: "A powerful prophet who called down fire from heaven.", equipType: 'avatar', equipValue: "/avatars/elijah.png", glow: "shadow-[0_0_15px_rgba(244,63,94,0.3)]" },
-            { id: 'avatarJoseph', name: "Joseph", cost: 500, icon: "<img src='/avatars/joseph.png' class='w-full h-full object-cover rounded-full' />", desc: "Dream interpreter who rose from the pit to the palace.", equipType: 'avatar', equipValue: "/avatars/joseph.png", glow: "shadow-[0_0_15px_rgba(34,211,238,0.3)]" },
-            { id: 'avatarJosuah', name: "Josuah", cost: 600, icon: "<img src='/avatars/josuah.png' class='w-full h-full object-cover rounded-full' />", desc: "Courageous commander who led the people forward.", equipType: 'avatar', equipValue: "/avatars/josuah.png", glow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" },
-            { id: 'avatarDeborah', name: "Judge Deborah", cost: 600, icon: "<img src='/avatars/judge-deborah.png' class='w-full h-full object-cover rounded-full' />", desc: "Wise prophetess and fearless leader in battle.", equipType: 'avatar', equipValue: "/avatars/judge-deborah.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
-            { id: 'avatarSamson', name: "Judge Samson", cost: 700, icon: "<img src='/avatars/judge-samson.png' class='w-full h-full object-cover rounded-full' />", desc: "Blessed with supernatural strength to defeat enemies.", equipType: 'avatar', equipValue: "/avatars/judge-samson.png", glow: "shadow-[0_0_15px_rgba(244,63,94,0.3)]" },
-            { id: 'avatarDavid', name: "King David", cost: 800, icon: "<img src='/avatars/king-david.png' class='w-full h-full object-cover rounded-full' />", desc: "A courageous warrior, psalmist, and king.", equipType: 'avatar', equipValue: "/avatars/king-david.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
-            { id: 'avatarSolomon', name: "King Solomon", cost: 800, icon: "<img src='/avatars/king-solomon.png' class='w-full h-full object-cover rounded-full' />", desc: "Renowned for his unprecedented wisdom and wealth.", equipType: 'avatar', equipValue: "/avatars/king-solomon.png", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
-            { id: 'avatarMary', name: "Mary", cost: 500, icon: "<img src='/avatars/mary.png' class='w-full h-full object-cover rounded-full' />", desc: "Favored and blessed, a model of humble obedience.", equipType: 'avatar', equipValue: "/avatars/mary.png", glow: "shadow-[0_0_15px_rgba(34,211,238,0.3)]" },
-            { id: 'avatarMoses', name: "Moses", cost: 700, icon: "<img src='/avatars/moses.png' class='w-full h-full object-cover rounded-full' />", desc: "Led his people through the waters into freedom.", equipType: 'avatar', equipValue: "/avatars/moses.png", glow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]" },
-            { id: 'avatarNoah', name: "Noah", cost: 400, icon: "<img src='/avatars/noah.png' class='w-full h-full object-cover rounded-full' />", desc: "Faithful builder who preserved life through the flood.", equipType: 'avatar', equipValue: "/avatars/noah.png", glow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" },
-            { id: 'avatarEsther', name: "Queen Esther", cost: 700, icon: "<img src='/avatars/queen-esther.png' class='w-full h-full object-cover rounded-full' />", desc: "Brave and wise advocate who saved her people.", equipType: 'avatar', equipValue: "/avatars/queen-esther.png", glow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]" },
-            { id: 'avatarRahab', name: "Rahab", cost: 400, icon: "<img src='/avatars/rahab.png' class='w-full h-full object-cover rounded-full' />", desc: "Showed great courage and faith to protect the spies.", equipType: 'avatar', equipValue: "/avatars/rahab.png", glow: "shadow-[0_0_15px_rgba(244,63,94,0.3)]" },
-            { id: 'avatarRuth', name: "Ruth", cost: 400, icon: "<img src='/avatars/ruth.png' class='w-full h-full object-cover rounded-full' />", desc: "A symbol of loyalty, devotion, and redemption.", equipType: 'avatar', equipValue: "/avatars/ruth.png", glow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" }
+            { id: 'avatarNinja', name: "Shadow Ninja", cost: 300, icon: "&#129399;", desc: "A silent but deadly learner. Perfect for stealthy points.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%B7%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(71,85,105,0.3)]" },
+            { id: 'avatarRobot', name: "Cyber Bot", cost: 400, icon: "&#129302;", desc: "Automate your success with this high-tech robot avatar.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(14,165,233,0.3)]" },
+            { id: 'avatarWizard', name: "Grand Wizard", cost: 600, icon: "&#129497;", desc: "Master the arcane arts of grammar and vocabulary.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%99%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(139,92,246,0.3)]" },
+            { id: 'avatarAstro', name: "Deep Space", cost: 800, icon: "&#128640;", desc: "Take your learning journey to the absolute stars.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%A8%E2%80%8D%F0%9F%9A%80%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(244,114,182,0.3)]" }
         ]
     },
 
@@ -54,7 +55,6 @@ export const shopController = {
             return;
         }
 
-        // 1. Manually hide all other active modules to prevent overlap
         const activeModules = document.querySelectorAll('main > *:not(.hidden)');
         activeModules.forEach(mod => {
             if (mod.id !== 'module-shop' && mod.id !== 'lifelines-panel') {
@@ -63,11 +63,9 @@ export const shopController = {
             }
         });
 
-        // 2. Unhide the Shop Module and apply the animation
         shopMod.classList.remove('hidden');
         shopMod.classList.add('fade-in');
 
-        // 3. Update the coins display safely
         const me = appStore.get('me');
         const shopCoinsEl = document.getElementById('shop-coins');
         if (me && shopCoinsEl) {
@@ -86,7 +84,6 @@ export const shopController = {
             shopMod.classList.remove('fade-in');
         }
         
-        // Return the user safely back to their dashboard
         const dashboard = document.getElementById('module-dashboard');
         if (dashboard) {
             dashboard.classList.remove('hidden');
@@ -102,9 +99,10 @@ export const shopController = {
             if (!btn) return;
             
             if (id === tabId) {
-                btn.className = `shop-tab-btn flex-1 min-w-[120px] bg-indigo-600 text-white font-black py-4 px-4 rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-all transform hover:-translate-y-1`;
+                // Integrated Amber gold style for active tabs
+                btn.className = `shop-tab-btn flex-1 min-w-[120px] bg-gradient-to-r from-amber-600 to-amber-500 text-white font-black py-4 px-4 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.5)] border border-amber-400 transition-all transform hover:-translate-y-1`;
             } else {
-                btn.className = `shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl transition-all transform hover:-translate-y-1`;
+                btn.className = `shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl transition-all transform hover:-translate-y-1 border border-transparent`;
             }
         });
 
@@ -126,9 +124,8 @@ export const shopController = {
             const isConsumable = this.currentTab === 'consumables';
             const hasPurchased = me.inventory[item.id] > 0 || me.inventory[item.id] === true;
             
-            // Check if equipped (Special handling for avatars vs standard equips)
             const isEquipped = item.equipType === 'avatar' 
-                ? me.avatar === item.equipValue 
+                ? me.equipped?.avatar === item.equipValue 
                 : me.equipped[item.equipType] === item.equipValue;
 
             let actionButton = '';
@@ -148,18 +145,18 @@ export const shopController = {
                     actionButton = `<button onclick="window.shopController.equipItem('${this.currentTab}', '${item.id}')" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:-translate-y-1 shadow-[0_0_15px_rgba(79,70,229,0.3)]">&#10024; EQUIP NOW</button>`;
                 } else {
                     actionButton = `
-                        <button onclick="window.shopController.buyItem('${this.currentTab}', '${item.id}')" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-105 shadow-md">
+                        <button onclick="window.shopController.buyItem('${this.currentTab}', '${item.id}')" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 border border-amber-700 text-slate-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-105 shadow-md">
                             <span>Unlock ${item.cost}</span> <span class="text-lg">&#129689;</span>
                         </button>
                     `;
                 }
             }
 
-            // Updated image rendering container to ensure proper masking of the new profile pictures
+            // Integrated enlarged avatars, gold hover styles, and preview triggers
             html += `
-                <div class="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-indigo-500/20 p-6 rounded-2xl text-center flex flex-col justify-between transition-all hover:border-indigo-400 dark:hover:border-indigo-400 hover:-translate-y-1 shadow-sm ${item.glow}">
+                <div class="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-indigo-500/20 p-6 rounded-2xl text-center flex flex-col justify-between transition-all hover:border-amber-400/50 dark:hover:border-amber-500/50 hover:-translate-y-1 shadow-sm ${item.glow}">
                     <div>
-                        <div class="w-20 h-20 mx-auto bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-4xl mb-4 border border-slate-300 dark:border-white/5 shadow-inner overflow-hidden">
+                        <div class="w-28 h-28 mx-auto bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-5xl mb-4 border border-slate-300 dark:border-white/5 shadow-inner overflow-hidden cursor-pointer hover:scale-105 transition-transform duration-300 avatar-preview-trigger">
                             ${item.icon}
                         </div>
                         <h4 class="font-black text-slate-900 dark:text-white text-xl mb-2">${item.name}</h4>
@@ -176,16 +173,16 @@ export const shopController = {
     },
 
     async buyItem(category, itemId) {
-        const me = appStore.get('me');
-        const item = this.catalog[category].find(i => i.id === itemId);
+        if (this._busy) return; 
 
+        const me = appStore.get('me');
+        const item = this.catalog[category]?.find(i => i.id === itemId);
         if (!me || !item) return;
 
         if (me.coins < item.cost) {
             if (window.toast) window.toast(`Not enough coins! You need ${item.cost - me.coins} more.`, false);
             if (window.sfx) window.sfx.play('wrong'); 
             
-            // UX Feedback: Shake the coin counter to show they are broke!
             const coinEl = document.getElementById('shop-coins');
             if (coinEl) {
                 coinEl.classList.add('text-rose-500', 'animate-pulse');
@@ -194,77 +191,152 @@ export const shopController = {
             return;
         }
 
-        try {
-            me.coins -= item.cost;
-            me.inventory = me.inventory || {};
-            
-            if (category === 'consumables') {
-                me.inventory[itemId] = (me.inventory[itemId] || 0) + 1;
-            } else {
-                me.inventory[itemId] = true; 
-            }
-            
-            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
-                const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}`);
-                await window.firebaseSet(userRef, me);
-            }
+        this._busy = true;
+        const previousCoins = me.coins;
+        const previousInventory = { ...me.inventory };
 
-            appStore.set('me', me);
+        me.coins -= item.cost;
+        me.inventory = me.inventory || {};
+        if (category === 'consumables') {
+            me.inventory[itemId] = (me.inventory[itemId] || 0) + 1;
+        } else {
+            me.inventory[itemId] = true; 
+        }
+
+        appStore.set('me', me);
+        this.renderItems();
+        const shopCoinsEl = document.getElementById('shop-coins');
+        if (shopCoinsEl) shopCoinsEl.innerText = me.coins;
+
+        try {
+            await persistPlayerFields(me, { coins: me.coins, inventory: me.inventory });
 
             if (window.toast) window.toast(`Successfully purchased ${item.name}!`, true);
             if (window.sfx) window.sfx.play('correct');
-
-            const shopCoinsEl = document.getElementById('shop-coins');
-            if (shopCoinsEl) shopCoinsEl.innerText = me.coins;
-            
-            this.renderItems(); 
-            
             if (window.dashboardController) window.dashboardController.renderDashboard();
 
         } catch (error) {
-            console.error("Purchase failed: ", error);
-            if (window.toast) window.toast("Transaction error. Connection lost.", false);
+            console.error("Purchase failed, rolling back local state: ", error);
+            const rolledBack = appStore.get('me');
+            rolledBack.coins = previousCoins;
+            rolledBack.inventory = previousInventory;
+            appStore.set('me', rolledBack);
+            this.renderItems();
+            if (shopCoinsEl) shopCoinsEl.innerText = rolledBack.coins;
+            if (window.toast) window.toast("Purchase failed — your coins were not spent. Check your connection.", false);
+        } finally {
+            this._busy = false;
         }
     },
 
     async equipItem(category, itemId) {
-        const me = appStore.get('me');
-        const item = this.catalog[category].find(i => i.id === itemId);
+        if (this._busy) return; 
 
+        const me = appStore.get('me');
+        const item = this.catalog[category]?.find(i => i.id === itemId);
         if (!me || !item || !me.inventory[itemId]) return;
 
+        this._busy = true;
+        const previousEquipped = { ...me.equipped };
+        const previousAvatar = me.avatar;
+        const previousBorder = me.border;
+
+        me.equipped = me.equipped || {};
+
+        if (item.equipType === 'avatar') {
+            me.equipped.avatar = item.equipValue;
+        } else {
+            me.equipped[item.equipType] = item.equipValue;
+            if(item.equipType === 'border') {
+                me.border = item.equipValue;
+            }
+        }
+
+        appStore.set('me', me);
+        this.renderItems();
+
         try {
-            me.equipped = me.equipped || {};
-            
-            // Handle Avatars directly modifying the root profile picture
-            if (item.equipType === 'avatar') {
-                me.avatar = item.equipValue;
-            } else {
-                me.equipped[item.equipType] = item.equipValue;
-                // Keep border synced at root level for Scoreboard backwards compatibility
-                if(item.equipType === 'border') {
-                    me.border = item.equipValue;
-                }
-            }
-
-            if (window.firebaseRef && window.firebaseSet && window.firebaseDB) {
-                const userRef = window.firebaseRef(window.firebaseDB, `users/${me.uid}`);
-                await window.firebaseSet(userRef, me);
-            }
-
-            appStore.set('me', me);
+            const fieldsToSync = { equipped: me.equipped };
+            if (item.equipType === 'border') fieldsToSync.border = me.border;
+            await persistPlayerFields(me, fieldsToSync);
 
             if (window.toast) window.toast(`Equipped ${item.name}!`, true);
             if (window.sfx) window.sfx.play('correct');
             
-            this.renderItems(); 
+            // Integrated Confetti Check
+            if (window.startConfetti) window.startConfetti();
+            
             if (window.dashboardController) window.dashboardController.renderDashboard();
             if (window.uiManager) window.uiManager.updateStudentHUD();
 
         } catch (error) {
-            console.error("Equip failed: ", error);
+            console.error("Equip failed, rolling back local state: ", error);
+            const rolledBack = appStore.get('me');
+            rolledBack.equipped = previousEquipped;
+            rolledBack.avatar = previousAvatar;
+            rolledBack.border = previousBorder;
+            appStore.set('me', rolledBack);
+            this.renderItems();
+            if (window.toast) window.toast("Couldn't equip that — check your connection and try again.", false);
+        } finally {
+            this._busy = false;
         }
     }
 };
+
+// Global Event Listener for Lightbox Modal
+document.addEventListener('click', (event) => {
+    const previewTrigger = event.target.closest('.avatar-preview-trigger');
+    
+    // Open Modal
+    if (previewTrigger) {
+        const card = previewTrigger.closest('.bg-white, .dark\\:bg-slate-800\\/80');
+        const modal = document.getElementById('avatar-preview-modal');
+        if (!modal || !card) return;
+        
+        const name = card.querySelector('h4')?.textContent || '';
+        const desc = card.querySelector('p')?.textContent || '';
+        const btnText = card.querySelector('button')?.textContent.trim() || '';
+
+        // Safely extract the inner content (works for images, SVGs, or emoji text)
+        const iconContainerHTML = previewTrigger.innerHTML;
+        const modalImg = document.getElementById('preview-modal-img');
+        
+        if (modalImg) {
+            // Because the catalog mixes SVGs/Emojis natively in the HTML, we inject it dynamically above the title
+            modalImg.style.display = 'none'; // Hide default image tag
+            let dynamicIcon = document.getElementById('dynamic-modal-icon');
+            
+            if (!dynamicIcon) {
+                dynamicIcon = document.createElement('div');
+                dynamicIcon.id = 'dynamic-modal-icon';
+                dynamicIcon.className = "w-48 h-48 sm:w-56 sm:h-56 mx-auto bg-slate-900 flex items-center justify-center text-7xl sm:text-8xl rounded-full border-4 border-amber-500 shadow-[0_0_25px_rgba(217,119,6,0.3)] mb-4 overflow-hidden";
+                modalImg.parentNode.insertBefore(dynamicIcon, modalImg);
+            }
+            dynamicIcon.innerHTML = iconContainerHTML;
+        }
+        
+        document.getElementById('preview-modal-name').textContent = name;
+        document.getElementById('preview-modal-desc').textContent = desc;
+        document.getElementById('preview-modal-cost').textContent = btnText.includes('EQUIP') ? 'Already Owned' : btnText;
+
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            const modalCard = document.getElementById('modal-card');
+            if(modalCard) {
+                modalCard.classList.remove('scale-95');
+                modalCard.classList.add('scale-100');
+            }
+        }, 10);
+    }
+
+    // Close Modal
+    if (event.target.id === 'avatar-preview-modal' || event.target.id === 'close-modal-btn') {
+        const modal = document.getElementById('avatar-preview-modal');
+        const modalCard = document.getElementById('modal-card');
+        if(modalCard) modalCard.classList.replace('scale-100', 'scale-95');
+        setTimeout(() => modal?.classList.add('hidden'), 150);
+    }
+});
 
 window.shopController = shopController;

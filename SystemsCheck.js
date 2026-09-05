@@ -77,7 +77,7 @@ export const systemsCheck = {
         if (allPassed) {
             console.log("%c🏁 Systems Check Complete: Phase 6 Architecture is completely valid and ready for launch.", "color: #4f46e5; font-weight: bold; background: #e0e7ff; padding: 4px; border-radius: 4px;");
         } else {
-            console.warn("%c⚠️ Systems Check Failed: One or more critical modules did not load.", "color: #f59e0b; font-weight: bold; background: #fef3c7; padding: 4px; border-radius: 4px;");
+            console.warn("%c⚠️ Systems Check Failed: One or more critical modules did not load.", "color: #D97706; font-weight: bold; background: #fef3c7; padding: 4px; border-radius: 4px;");
         }
     }
 };
