@@ -30,7 +30,64 @@ class Store {
     }
 }
 
-// Export the ultimate fallback avatar for new users
+// ==========================================
+// 🛒 SHOP METADATA & HELPER CONFIGURATION
+// ==========================================
+
+export const SHOP_CATEGORIES = [
+    { id: 'prophets', label: 'Prophets', icon: '📜', badgeColor: 'bg-purple-500/20 text-purple-300' },
+    { id: 'kings', label: 'Kings', icon: '👑', badgeColor: 'bg-amber-500/20 text-amber-300' },
+    { id: 'valiants', label: "David's Valiants", icon: '⚔️', badgeColor: 'bg-slate-500/20 text-slate-300' },
+    { id: 'judges', label: 'Judges', icon: '⚖️', badgeColor: 'bg-emerald-500/20 text-emerald-300' },
+    { id: 'villains', label: 'Villains', icon: '🐍', badgeColor: 'bg-red-500/20 text-red-400' },
+    { id: 'apostles', label: 'Apostles', icon: '🕊️', badgeColor: 'bg-sky-500/20 text-sky-300' },
+    { id: 'legends', label: 'Legends & Patriarchs', icon: '✨', badgeColor: 'bg-teal-500/20 text-teal-300' }
+];
+
+export const avatarShop = [
+    { id: 'king-david', name: 'King David', category: 'kings', image: './public/avatars/king-david.png', price: 0 },
+    { id: 'ruth', name: 'Ruth', category: 'legends', image: './public/avatars/ruth.png', price: 0 },
+    { id: 'mary', name: 'Mary', category: 'legends', image: './public/avatars/mary.png', price: 50 },
+    { id: 'joseph', name: 'Joseph', category: 'legends', image: './public/avatars/joseph.png', price: 50 },
+    { id: 'noah', name: 'Noah', category: 'legends', image: './public/avatars/noah.png', price: 50 },
+    { id: 'abraham', name: 'Abraham', category: 'legends', image: './public/avatars/abraham.png', price: 100 },
+    { id: 'elijah', name: 'Elijah', category: 'prophets', image: './public/avatars/elijah.png', price: 100 },
+    { id: 'daniel', name: 'Daniel', category: 'prophets', image: './public/avatars/daniel.png', price: 100 },
+    { id: 'rahab', name: 'Rahab', category: 'legends', image: './public/avatars/rahab.png', price: 100 },
+    { id: 'moses', name: 'Moses', category: 'prophets', image: './public/avatars/moses.png', price: 100 },
+    { id: 'josuah', name: 'Joshua', category: 'legends', image: './public/avatars/josuah.png', price: 100 },
+    { id: 'apostle-peter', name: 'Apostle Peter', category: 'apostles', image: './public/avatars/apostle-peter.png', price: 150 },
+    { id: 'apostle-paul', name: 'Apostle Paul', category: 'apostles', image: './public/avatars/apostle-paul.png', price: 150 },
+    { id: 'queen-esther', name: 'Queen Esther', category: 'legends', image: './public/avatars/queen-esther.png', price: 150 },
+    { id: 'judge-deborah', name: 'Judge Deborah', category: 'judges', image: './public/avatars/judge-deborah.png', price: 150 },
+    { id: 'judge-samson', name: 'Judge Samson', category: 'judges', image: './public/avatars/judge-samson.png', price: 150 },
+    { id: 'king-solomon', name: 'King Solomon', category: 'kings', image: './public/avatars/king-solomon.png', price: 300 },
+    { id: 'archangel-michael', name: 'Archangel Michael', category: 'legends', image: './public/avatars/archangel-michael.png', price: 300 }
+];
+
+// ==========================================
+// 🛒 SHOP HELPER FUNCTIONS
+// ==========================================
+
+export function getItemsByCategory(category) {
+    return avatarShop.filter(item => item.category === category);
+}
+
+export function searchItemsByName(query) {
+    if (!query) return avatarShop;
+    const lowerQuery = query.toLowerCase();
+    return avatarShop.filter(item => item.name.toLowerCase().includes(lowerQuery));
+}
+
+export function getFeaturedItems() {
+    // Arbitrary logic: Featured items are the most expensive ones (e.g., price >= 150)
+    return avatarShop.filter(item => item.price >= 150);
+}
+
+// ==========================================
+// 🖼️ AVATAR UTILITIES
+// ==========================================
+
 export const DEFAULT_AVATAR = './public/avatars/king-david.png';
 
 /**
@@ -62,7 +119,11 @@ export function getAvatarUrl(avatar, fileName = null) {
     return DEFAULT_AVATAR;
 }
 
-// 4. Initialize the global store with Multi-Tenancy Room support
+// ==========================================
+// 🎮 GLOBAL STORE INITIALIZATION
+// ==========================================
+
+// Initialize the global store with Multi-Tenancy Room support
 export const appStore = new Store({
     role: null,             
     roomCode: '',           
@@ -81,32 +142,12 @@ export const appStore = new Store({
         maxStreak: 0,
         xp: 0,
         coins: 0,
-        // Grant the starter avatars by default
         inventory: { 'king-david': true, 'ruth': true },
         equipped: { title: 'Novice Learner', border: 'border-slate-300' }
     },
     
-    // The Avatar Shop inventory and prices
-    avatarShop: [
-        { id: 'king-david', name: 'King David', image: './public/avatars/king-david.png', price: 0 },
-        { id: 'ruth', name: 'Ruth', image: './public/avatars/ruth.png', price: 0 },
-        { id: 'mary', name: 'Mary', image: './public/avatars/mary.png', price: 50 },
-        { id: 'joseph', name: 'Joseph', image: './public/avatars/joseph.png', price: 50 },
-        { id: 'noah', name: 'Noah', image: './public/avatars/noah.png', price: 50 },
-        { id: 'abraham', name: 'Abraham', image: './public/avatars/abraham.png', price: 100 },
-        { id: 'elijah', name: 'Elijah', image: './public/avatars/elijah.png', price: 100 },
-        { id: 'daniel', name: 'Daniel', image: './public/avatars/daniel.png', price: 100 },
-        { id: 'rahab', name: 'Rahab', image: './public/avatars/rahab.png', price: 100 },
-        { id: 'moses', name: 'Moses', image: './public/avatars/moses.png', price: 100 },
-        { id: 'josuah', name: 'Joshua', image: './public/avatars/josuah.png', price: 100 },
-        { id: 'apostle-peter', name: 'Apostle Peter', image: './public/avatars/apostle-peter.png', price: 150 },
-        { id: 'apostle-paul', name: 'Apostle Paul', image: './public/avatars/apostle-paul.png', price: 150 },
-        { id: 'queen-esther', name: 'Queen Esther', image: './public/avatars/queen-esther.png', price: 150 },
-        { id: 'judge-deborah', name: 'Judge Deborah', image: './public/avatars/judge-deborah.png', price: 150 },
-        { id: 'judge-samson', name: 'Judge Samson', image: './public/avatars/judge-samson.png', price: 150 },
-        { id: 'king-solomon', name: 'King Solomon', image: './public/avatars/king-solomon.png', price: 300 },
-        { id: 'archangel-michael', name: 'Archangel Michael', image: './public/avatars/archangel-michael.png', price: 300 }
-    ],
+    // Insert our extracted and categorized avatarShop here
+    avatarShop: avatarShop,
     
     players: {},            
     currentModule: 0,       

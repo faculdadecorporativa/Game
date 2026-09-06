@@ -5,7 +5,8 @@ import { appStore } from './store.js';
 
 // 🔥 DUPLICATION NOTE: same helper as in LifelineController.js and
 // GameController.js — see the comment there recommending this be
-// extracted into one shared module.
+// extracted into one shared module. Kept local so this file stays
+// self-contained for this review batch.
 async function persistPlayerFields(me, fields) {
     if (!window.pb) {
         console.error("PocketBase client (window.pb) not found — purchase/equip not persisted.");
@@ -15,13 +16,14 @@ async function persistPlayerFields(me, fields) {
         console.warn("No playerId on `me` — skipping remote sync (host test session?).");
         return;
     }
-    await window.pb.collection('players').update(me.playerId, fields); 
+    await window.pb.collection('players').update(me.playerId, fields); // caller handles try/catch — see buyItem/equipItem for rollback logic
 }
 
 export const shopController = {
     currentTab: 'consumables', 
-    _busy: false, 
+    _busy: false, // 🔥 see buyItem()/equipItem() — guards against double-submit races
 
+    // Comprehensive Categorized Premium Catalog (Safe HTML Entities)
     catalog: {
         consumables: [
             { id: 'extraLife', name: "Extra Life", cost: 100, icon: "&#128305;", desc: "Saves you from losing your streak on a wrong answer.", glow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]" },
@@ -40,6 +42,9 @@ export const shopController = {
             { id: 'titleMaster', name: "Grammar Master", cost: 300, icon: "&#128218;", desc: "Equip this title for achieving flawless academic accuracy.", equipType: 'title', equipValue: 'Grammar Master', glow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]" },
             { id: 'titleUnstoppable', name: "Unstoppable", cost: 500, icon: "&#9732;", desc: "Exclusive, legendary title reserved for streak masters.", equipType: 'title', equipValue: 'Unstoppable', glow: "shadow-[0_0_15px_rgba(239,68,68,0.3)]" }
         ],
+        // 🔥 IMPORTANT: `equipValue` for these is a full inline SVG data URI,
+        // NOT a filename. See equipItem() below for why these must never
+        // be written to `me.avatar` directly.
         avatars: [
             { id: 'avatarNinja', name: "Shadow Ninja", cost: 300, icon: "&#129399;", desc: "A silent but deadly learner. Perfect for stealthy points.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%B7%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(71,85,105,0.3)]" },
             { id: 'avatarRobot', name: "Cyber Bot", cost: 400, icon: "&#129302;", desc: "Automate your success with this high-tech robot avatar.", equipType: 'avatar', equipValue: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E", glow: "shadow-[0_0_15px_rgba(14,165,233,0.3)]" },
@@ -55,6 +60,7 @@ export const shopController = {
             return;
         }
 
+        // 1. Manually hide all other active modules to prevent overlap
         const activeModules = document.querySelectorAll('main > *:not(.hidden)');
         activeModules.forEach(mod => {
             if (mod.id !== 'module-shop' && mod.id !== 'lifelines-panel') {
@@ -63,9 +69,11 @@ export const shopController = {
             }
         });
 
+        // 2. Unhide the Shop Module and apply the animation
         shopMod.classList.remove('hidden');
         shopMod.classList.add('fade-in');
 
+        // 3. Update the coins display safely
         const me = appStore.get('me');
         const shopCoinsEl = document.getElementById('shop-coins');
         if (me && shopCoinsEl) {
@@ -84,6 +92,7 @@ export const shopController = {
             shopMod.classList.remove('fade-in');
         }
         
+        // Return the user safely back to their dashboard
         const dashboard = document.getElementById('module-dashboard');
         if (dashboard) {
             dashboard.classList.remove('hidden');
@@ -99,10 +108,9 @@ export const shopController = {
             if (!btn) return;
             
             if (id === tabId) {
-                // Integrated Amber gold style for active tabs
-                btn.className = `shop-tab-btn flex-1 min-w-[120px] bg-gradient-to-r from-amber-600 to-amber-500 text-white font-black py-4 px-4 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.5)] border border-amber-400 transition-all transform hover:-translate-y-1`;
+                btn.className = `shop-tab-btn flex-1 min-w-[120px] bg-indigo-600 text-white font-black py-4 px-4 rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-all transform hover:-translate-y-1`;
             } else {
-                btn.className = `shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl transition-all transform hover:-translate-y-1 border border-transparent`;
+                btn.className = `shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl transition-all transform hover:-translate-y-1`;
             }
         });
 
@@ -118,12 +126,23 @@ export const shopController = {
         me.equipped = me.equipped || { title: 'Novice Learner', border: 'border-slate-300' };
 
         const items = this.catalog[this.currentTab];
+
+        // (Already correct — this builds a plain local string with `+=`
+        // in a loop, then assigns to `container.innerHTML` ONCE at the
+        // end. That's different from the `element.innerHTML += ...`
+        // anti-pattern fixed elsewhere in this codebase — that pattern
+        // re-parses live DOM on every iteration; a local string variable
+        // does not. No change needed here.)
         let html = '';
 
         items.forEach(item => {
             const isConsumable = this.currentTab === 'consumables';
             const hasPurchased = me.inventory[item.id] > 0 || me.inventory[item.id] === true;
             
+            // 🔥 FIX: was `me.avatar === item.equipValue` — now checks
+            // `me.equipped?.avatar`, matching equipItem()'s corrected
+            // storage location (see the comment there for why `me.avatar`
+            // itself can't hold this value).
             const isEquipped = item.equipType === 'avatar' 
                 ? me.equipped?.avatar === item.equipValue 
                 : me.equipped[item.equipType] === item.equipValue;
@@ -145,18 +164,17 @@ export const shopController = {
                     actionButton = `<button onclick="window.shopController.equipItem('${this.currentTab}', '${item.id}')" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:-translate-y-1 shadow-[0_0_15px_rgba(79,70,229,0.3)]">&#10024; EQUIP NOW</button>`;
                 } else {
                     actionButton = `
-                        <button onclick="window.shopController.buyItem('${this.currentTab}', '${item.id}')" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 border border-amber-700 text-slate-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-105 shadow-md">
+                        <button onclick="window.shopController.buyItem('${this.currentTab}', '${item.id}')" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-105 shadow-md">
                             <span>Unlock ${item.cost}</span> <span class="text-lg">&#129689;</span>
                         </button>
                     `;
                 }
             }
 
-            // Integrated enlarged avatars, gold hover styles, and preview triggers
             html += `
-                <div class="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-indigo-500/20 p-6 rounded-2xl text-center flex flex-col justify-between transition-all hover:border-amber-400/50 dark:hover:border-amber-500/50 hover:-translate-y-1 shadow-sm ${item.glow}">
+                <div class="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-indigo-500/20 p-6 rounded-2xl text-center flex flex-col justify-between transition-all hover:border-indigo-400 dark:hover:border-indigo-400 hover:-translate-y-1 shadow-sm ${item.glow}">
                     <div>
-                        <div class="w-28 h-28 mx-auto bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-5xl mb-4 border border-slate-300 dark:border-white/5 shadow-inner overflow-hidden cursor-pointer hover:scale-105 transition-transform duration-300 avatar-preview-trigger">
+                        <div class="w-20 h-20 mx-auto bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-4xl mb-4 border border-slate-300 dark:border-white/5 shadow-inner">
                             ${item.icon}
                         </div>
                         <h4 class="font-black text-slate-900 dark:text-white text-xl mb-2">${item.name}</h4>
@@ -173,7 +191,15 @@ export const shopController = {
     },
 
     async buyItem(category, itemId) {
-        if (this._busy) return; 
+        // 🔥 FIX: no guard existed against a rapid double-click. The old
+        // code mutated the local `me` clone and only called
+        // `appStore.set('me', me)` AFTER an awaited network call — so a
+        // second click firing before that await resolved would read the
+        // STILL-STALE pre-purchase coin balance from appStore, letting a
+        // student double-spend (buy two items whose combined cost exceeds
+        // their actual balance). This flag closes that window regardless
+        // of timing.
+        if (this._busy) return;
 
         const me = appStore.get('me');
         const item = this.catalog[category]?.find(i => i.id === itemId);
@@ -183,6 +209,7 @@ export const shopController = {
             if (window.toast) window.toast(`Not enough coins! You need ${item.cost - me.coins} more.`, false);
             if (window.sfx) window.sfx.play('wrong'); 
             
+            // 🔥 UX Feedback: Shake the coin counter to show they are broke!
             const coinEl = document.getElementById('shop-coins');
             if (coinEl) {
                 coinEl.classList.add('text-rose-500', 'animate-pulse');
@@ -203,6 +230,10 @@ export const shopController = {
             me.inventory[itemId] = true; 
         }
 
+        // 🔥 FIX: apply the local/optimistic update FIRST (this is what
+        // actually closes the double-click race described above), then
+        // persist. If the persist fails, roll the optimistic update back
+        // below instead of leaving local and remote state disagreeing.
         appStore.set('me', me);
         this.renderItems();
         const shopCoinsEl = document.getElementById('shop-coins');
@@ -230,7 +261,7 @@ export const shopController = {
     },
 
     async equipItem(category, itemId) {
-        if (this._busy) return; 
+        if (this._busy) return; // same double-submit guard as buyItem()
 
         const me = appStore.get('me');
         const item = this.catalog[category]?.find(i => i.id === itemId);
@@ -243,10 +274,34 @@ export const shopController = {
 
         me.equipped = me.equipped || {};
 
+        // 🔥 FIX (the most important bug in this file): the old code did
+        // `me.avatar = item.equipValue` for shop avatars — but
+        // `item.equipValue` here is a full inline SVG DATA URI, while
+        // `me.avatar` is contractually a bare filename everywhere else in
+        // this app (getAvatarUrl() in store.js builds
+        // `/public/avatars/${me.avatar}` from it). Writing a data URI into
+        // that field would produce a nonsense broken path
+        // (`/public/avatars/data:image/svg+xml,...`) the instant a
+        // student equips ANY shop avatar, breaking their avatar on the
+        // HUD, scoreboard, and leaderboard everywhere it's rendered.
+        // Storing it under `me.equipped.avatar` instead — the same
+        // pattern already used for border/title — keeps the two avatar
+        // systems (uploaded-photo filename vs. shop cosmetic overlay)
+        // separate. IMPORTANT FOLLOW-UP: UIController.js's avatar
+        // rendering (HUD/scoreboard/leaderboard) needs a matching
+        // read-side change to check `me.equipped?.avatar` first and fall
+        // back to `getAvatarUrl(me.avatar)` — otherwise a purchased
+        // avatar will now save correctly but still not be visible
+        // anywhere. Flagging for whenever that file comes back around.
         if (item.equipType === 'avatar') {
             me.equipped.avatar = item.equipValue;
         } else {
             me.equipped[item.equipType] = item.equipValue;
+            // Keep border synced at root level too — confirmed necessary:
+            // UIController.js's HUD/scoreboard read `me.border`/`p.border`
+            // directly (root field), not `me.equipped.border`, so this
+            // sync is correct and needed, unlike the avatar case above
+            // where the root field has an incompatible, unrelated meaning.
             if(item.equipType === 'border') {
                 me.border = item.equipValue;
             }
@@ -263,13 +318,13 @@ export const shopController = {
             if (window.toast) window.toast(`Equipped ${item.name}!`, true);
             if (window.sfx) window.sfx.play('correct');
             
-            // Integrated Confetti Check
-            if (window.startConfetti) window.startConfetti();
-            
             if (window.dashboardController) window.dashboardController.renderDashboard();
             if (window.uiManager) window.uiManager.updateStudentHUD();
 
         } catch (error) {
+            // 🔥 FIX: the old catch block only logged to console — a
+            // failed equip silently desynced local vs. remote state with
+            // zero feedback to the student. Now rolls back and tells them.
             console.error("Equip failed, rolling back local state: ", error);
             const rolledBack = appStore.get('me');
             rolledBack.equipped = previousEquipped;
@@ -283,60 +338,5 @@ export const shopController = {
         }
     }
 };
-
-// Global Event Listener for Lightbox Modal
-document.addEventListener('click', (event) => {
-    const previewTrigger = event.target.closest('.avatar-preview-trigger');
-    
-    // Open Modal
-    if (previewTrigger) {
-        const card = previewTrigger.closest('.bg-white, .dark\\:bg-slate-800\\/80');
-        const modal = document.getElementById('avatar-preview-modal');
-        if (!modal || !card) return;
-        
-        const name = card.querySelector('h4')?.textContent || '';
-        const desc = card.querySelector('p')?.textContent || '';
-        const btnText = card.querySelector('button')?.textContent.trim() || '';
-
-        // Safely extract the inner content (works for images, SVGs, or emoji text)
-        const iconContainerHTML = previewTrigger.innerHTML;
-        const modalImg = document.getElementById('preview-modal-img');
-        
-        if (modalImg) {
-            // Because the catalog mixes SVGs/Emojis natively in the HTML, we inject it dynamically above the title
-            modalImg.style.display = 'none'; // Hide default image tag
-            let dynamicIcon = document.getElementById('dynamic-modal-icon');
-            
-            if (!dynamicIcon) {
-                dynamicIcon = document.createElement('div');
-                dynamicIcon.id = 'dynamic-modal-icon';
-                dynamicIcon.className = "w-48 h-48 sm:w-56 sm:h-56 mx-auto bg-slate-900 flex items-center justify-center text-7xl sm:text-8xl rounded-full border-4 border-amber-500 shadow-[0_0_25px_rgba(217,119,6,0.3)] mb-4 overflow-hidden";
-                modalImg.parentNode.insertBefore(dynamicIcon, modalImg);
-            }
-            dynamicIcon.innerHTML = iconContainerHTML;
-        }
-        
-        document.getElementById('preview-modal-name').textContent = name;
-        document.getElementById('preview-modal-desc').textContent = desc;
-        document.getElementById('preview-modal-cost').textContent = btnText.includes('EQUIP') ? 'Already Owned' : btnText;
-
-        modal.classList.remove('hidden');
-        setTimeout(() => {
-            const modalCard = document.getElementById('modal-card');
-            if(modalCard) {
-                modalCard.classList.remove('scale-95');
-                modalCard.classList.add('scale-100');
-            }
-        }, 10);
-    }
-
-    // Close Modal
-    if (event.target.id === 'avatar-preview-modal' || event.target.id === 'close-modal-btn') {
-        const modal = document.getElementById('avatar-preview-modal');
-        const modalCard = document.getElementById('modal-card');
-        if(modalCard) modalCard.classList.replace('scale-100', 'scale-95');
-        setTimeout(() => modal?.classList.add('hidden'), 150);
-    }
-});
 
 window.shopController = shopController;

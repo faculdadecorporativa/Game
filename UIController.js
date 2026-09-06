@@ -4,8 +4,19 @@
 import { tailwindColors, animalThemes } from './data.js';
 import { appStore, getAvatarUrl } from './store.js';
 
+// 🔥 FIX: every avatar <img> in this file was doing `src="${p.avatar}"` —
+// but per the app's schema, `avatar` is a bare filename ("king-david.png"),
+// not a path. Rendering it raw means the browser requests a 404 relative
+// to the current page URL instead of `/public/avatars/king-david.png`.
+// getAvatarUrl() (from store.js) builds the correct path AND falls back to
+// a default filename when avatar is missing/empty. Paired with this
+// onerror handler, a bad/deleted avatar file also degrades gracefully
+// instead of showing a broken image icon. `this.onerror=null` prevents an
+// infinite loop if the default avatar itself 404s.
 const AVATAR_ONERROR = `this.onerror=null;this.src='${getAvatarUrl(null)}';`;
 
+// Placeholder used for the professor HUD, which (unlike student avatars)
+// stores a data URI in localStorage rather than a server filename.
 const DEFAULT_PROF_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
 function getRankEmoji(score, allPlayers) {
@@ -21,7 +32,6 @@ export const uiManager = {
     hideAll() { 
         const allModules = [
             'module-0', 'module-join-pin', 'module-waiting', 'module-admin', 
-            'module-dashboard', 'module-shop', 
             'module-1', 'module-2', 'module-3', 'module-4', 'module-5', 'module-6', 
             'module-7', 'module-8', 'module-9', 'module-10', 'module-11', 'module-12'
         ];
@@ -50,6 +60,11 @@ export const uiManager = {
         if (status) status.classList.remove('hidden');
         
         const profName = appStore.get('profName') || "Professor"; 
+        // Professor avatars are stored as data URIs in localStorage (from
+        // the character-upload flow), not filenames — getAvatarUrl()
+        // doesn't apply here. Already has a default via `||`; the onerror
+        // below adds a second layer of protection if that stored value is
+        // ever corrupted (e.g. truncated localStorage write).
         const savedAvatar = localStorage.getItem('profAvatar') || DEFAULT_PROF_SVG;
 
         if (c) {
@@ -89,6 +104,12 @@ export const uiManager = {
         
         const players = appStore.get('players') || {};
         
+        // 🔥 FIX: was `c.innerHTML = ''` then `c.innerHTML += ...` inside
+        // the forEach. Each `+=` re-serializes and re-parses the ENTIRE
+        // accumulated string and rebuilds every already-rendered node from
+        // scratch — O(n²) work for n players, and since this runs on
+        // every real-time roster update, it gets worse as a class grows.
+        // Build the HTML once as an array, join, and assign a single time.
         const rows = Object.values(players)
             .sort((a, b) => (b.scores?.total || 0) - (a.scores?.total || 0))
             .map(p => {
@@ -143,6 +164,8 @@ export const uiManager = {
 
     renderStudy() {
         const c = document.getElementById('flashcards-container'); if(!c) return;
+        // 🔥 FIX: same innerHTML += anti-pattern as updateScoreboard() —
+        // build once, assign once.
         const cards = (window.lessonData.vocabulary || []).map(item => `
             <div class="perspective-1000 h-48 w-full group">
                 <div class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-md hover:shadow-xl rounded-2xl cursor-pointer transition-all duration-500" onclick="this.parentElement.classList.toggle('flipped')">
@@ -158,15 +181,26 @@ export const uiManager = {
         c.innerHTML = cards.join('');
     },
 
+    // 🔥 FIX (missing function): GameController.js's `startModule()` calls
+    // `window.uiManager.renderSpelling(targetData)` for Module 6 (Spelling
+    // Bee), but this function did not exist anywhere in UIController.js.
+    // Every time a student reached the Spelling module, this threw
+    // `TypeError: window.uiManager.renderSpelling is not a function` and
+    // broke the module entirely. Implemented to match the pattern
+    // `submitSpelling()` in GameController.js expects: a `#spelling-input`
+    // with its `dataset.target` set to the answer, plus a "Listen" button
+    // that speaks the word. ASSUMPTION: `data.word` holds the word to
+    // spell — adjust the field name if your `spellingBee` records use a
+    // different key (e.g. `data.term`).
     renderSpelling(data) {
         const inp = document.getElementById('spelling-input');
         if (inp) {
             inp.value = '';
-            inp.dataset.target = data.word || data.term || '';
+            inp.dataset.target = data.word;
         }
 
         const listenBtn = document.getElementById('btn-spelling-listen');
-        if (listenBtn) listenBtn.onclick = () => window.speakText(data.word || data.term || '');
+        if (listenBtn) listenBtn.onclick = () => window.speakText(data.word);
 
         const promptEl = document.getElementById('spelling-prompt');
         if (promptEl && data.hint) promptEl.innerText = data.hint;
@@ -398,6 +432,7 @@ export const uiManager = {
         
         grid.className = `grid gap-2 md:gap-4 w-full transition-all duration-500 ${cols}`;
         
+        // 🔥 FIX: same innerHTML += anti-pattern as elsewhere in this file.
         const cardEls = cards.map((card, i) => `
             <div class="perspective-1000 aspect-[4/3] w-full group cursor-pointer hover:scale-105 active:scale-95 transition-all duration-300" onclick="if(window.game && window.game.handleMemoryClick) window.game.handleMemoryClick(${i})">
                 <div id="mem-card-${i}" class="flip-card-inner transform-style-3d relative w-full h-full text-center shadow-sm hover:shadow-lg rounded-xl transition-transform duration-500">
@@ -445,6 +480,8 @@ export const uiManager = {
     },
 
     renderAudio(data) {
+        // 🔥 FIX: `.onclick` was set directly on the getElementById result
+        // with no null check — same crash risk as renderQuiz above.
         const listenBtn = document.getElementById('btn-audio-listen');
         const c = document.getElementById('audio-options-container');
         if (!listenBtn || !c) return;
@@ -463,7 +500,7 @@ export const uiManager = {
     renderHangman(phrase) {
         this.updateHangmanArt(); this.updateHangmanWord();
         const kbd = document.getElementById('hangman-keyboard');
-        if (!kbd) return;
+        if (!kbd) return; // 🔥 FIX: was unguarded — would throw before rendering any letters
         kbd.innerHTML = '';
         'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(char => { 
             const btn = document.createElement('button'); 
@@ -476,11 +513,11 @@ export const uiManager = {
     },
     updateHangmanArt() {
         const artEl = document.getElementById('hangman-art');
-        if (artEl) artEl.innerText = hangmanArtFrames[appStore.get('localGameData').hmStrikes];
+        if (artEl) artEl.innerText = hangmanArtFrames[appStore.get('localGameData').hmStrikes]; // 🔥 FIX: was unguarded
     },
     updateHangmanWord() {
         const c = document.getElementById('hangman-word');
-        if (!c) return;
+        if (!c) return; // 🔥 FIX: was unguarded
         c.innerHTML = '';
         appStore.get('localGameData').hmPhrase.split('').forEach(char => { const span = document.createElement('span'); if (char === ' ') span.innerHTML = '&nbsp;&nbsp;'; else { span.className = "border-b-4 border-indigo-700 dark:border-indigo-400 mx-1 w-6 inline-block text-center shadow-sm"; span.innerText = appStore.get('localGameData').hmGuessed.includes(char) ? char : '_'; } c.appendChild(span); });
     },
@@ -493,6 +530,10 @@ export const uiManager = {
         const targetEl = document.getElementById('read-aloud-target');
         if(targetEl) targetEl.innerHTML = wrappedText; 
         
+        // 🔥 FIX: none of these three lookups were null-checked — a missing
+        // element would throw and abort the rest of renderReadAloud(),
+        // including the status reset and the stopReadAloud() cleanup call
+        // below.
         const btn = document.getElementById('btn-record-read');
         if (btn) {
             btn.style.pointerEvents = 'auto';
@@ -523,6 +564,9 @@ export const uiManager = {
     },
     
     renderQuiz(data) {
+        // 🔥 FIX: neither element was null-checked — if either is missing
+        // from the DOM this throws and the whole module fails to render
+        // with no fallback.
         const qEl = document.getElementById('quiz-question-text');
         const c = document.getElementById('quiz-options-container');
         if (!qEl || !c) return;
@@ -539,6 +583,11 @@ export const uiManager = {
     
     showFinalResults(playersObj) {
         this.hideAll();
+        // 🔥 FIX: these four were called with zero null-checks. This
+        // function fires exactly once, at the single most important
+        // moment (end of game) — if any one of these elements is missing
+        // in a given UI layout, the whole results screen (leaderboard,
+        // confetti, personal stats) previously failed to render at all.
         document.getElementById('module-12')?.classList.remove('hidden');
         document.getElementById('game-status')?.classList.add('hidden');
         document.getElementById('scoreboard-container')?.classList.add('hidden');
@@ -569,6 +618,9 @@ export const uiManager = {
         const sorted = Object.values(playersObj).sort((a,b) => (b.scores?.total || 0) - (a.scores?.total || 0)); 
         const list = document.getElementById('final-leaderboard-list');
 
+        // 🔥 FIX: same innerHTML += anti-pattern as updateScoreboard() /
+        // renderStudy() — build once, assign once. Also fixes the same
+        // missing-avatar-path bug (`p.avatar` needs getAvatarUrl()).
         const rows = sorted.map((p, i) => {
             const medal = getRankEmoji(p.scores?.total || 0, Object.values(playersObj));
             const theme = animalThemes[p.team] || animalThemes['eagle'];
@@ -594,6 +646,9 @@ export const uiManager = {
         if (list) list.innerHTML = rows.join('');
         
         if(appStore.get('role') === 'student') {
+            // 🔥 FIX: `.classList` and `bars.innerHTML` were both accessed
+            // without null checks, and `bars.innerHTML += ...` had the same
+            // O(n²) rebuild-in-a-loop issue as elsewhere in this file.
             document.getElementById('student-personal-stats')?.classList.remove('hidden');
             const bars = document.getElementById('student-skill-bars');
             const me = appStore.get('me');

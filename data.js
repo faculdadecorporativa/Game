@@ -8,13 +8,24 @@ export const defaultLessonData = {
     ],
     puzzleMatch: { 
         image: "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&q=80",
-        questions: [{ q: "What is the primary goal of feedback?", options: ["Growth", "Confusion", "Criticism", "Delay"], answer: 0 }] 
+        // 🔥 FIX: was missing `skill`. GameController.js's submitScore()
+        // does `me.scores[skill] += points` using each question's own
+        // `.skill` field — with it undefined, that silently creates a
+        // bogus `scores.undefined` bucket instead of crediting a real
+        // category, so this question's points never showed up in the
+        // Speaking/Writing/Listening/General breakdown anywhere (dashboard
+        // stats, analytics radar chart). AdminController.js's own
+        // addItem('puzzleMatch') template already includes `skill:
+        // "General"` for newly-created questions — this brings the seed
+        // data in line with that same convention.
+        questions: [{ q: "What is the primary goal of feedback?", options: ["Growth", "Confusion", "Criticism", "Delay"], answer: 0, skill: "General" }] 
     },
     hotspots: [
         { prompt: "Find the Feedback Receiver (Person listening)", target: { top: 35, left: 60, width: 20, height: 45 } }
     ],
     ticTacToe: [
-        { q: "Feedback should be specific rather than general. True or False?", options: ["True", "False"], answer: 0 }
+        // 🔥 FIX: same missing-`skill` issue as puzzleMatch above.
+        { q: "Feedback should be specific rather than general. True or False?", options: ["True", "False"], answer: 0, skill: "General" }
     ],
     audioGuess: [
         { desc: "This concept describes how we naturally want to defend ourselves against criticism by rejecting the validity of the feedback.", options: ["Performance Homeostasis", "Denial", "Halo Effect", "Codependence"], answer: 1, skill: "Listening" }
@@ -48,13 +59,15 @@ export const cyberSecurityMockData = {
     ],
     puzzleMatch: { 
         image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80",
-        questions: [{ q: "What protocol secures web traffic?", options: ["HTTP", "HTTPS", "FTP", "SMTP"], answer: 1 }] 
+        // 🔥 FIX: same missing-`skill` issue as defaultLessonData above.
+        questions: [{ q: "What protocol secures web traffic?", options: ["HTTP", "HTTPS", "FTP", "SMTP"], answer: 1, skill: "General" }] 
     },
     hotspots: [
         { prompt: "Find the locked padlock symbol", target: { top: 20, left: 20, width: 15, height: 15 } }
     ],
     ticTacToe: [
-        { q: "Is sharing your password safe?", options: ["Yes", "No"], answer: 1 }
+        // 🔥 FIX: same missing-`skill` issue as defaultLessonData above.
+        { q: "Is sharing your password safe?", options: ["Yes", "No"], answer: 1, skill: "General" }
     ],
     audioGuess: [
         { desc: "This is a security system that monitors and controls network traffic based on rules.", options: ["Malware", "Phishing", "Firewall", "Encryption"], answer: 2, skill: "Listening" }
@@ -81,6 +94,17 @@ export const cyberSecurityMockData = {
     chatPhrases: ["Excellent!", "Secure choice!", "Well done, admin!", "Hacker defeated!", "Top tier!"]
 };
 
+// 🔥 FIX: was missing `indigo`, `emerald`, and `rose` entries.
+// AdminController.js's addTeam() randomly assigns a new custom team's
+// color from `['red','blue','green','yellow','purple','pink','indigo',
+// 'cyan','emerald','rose']` — three of those ten possible outcomes had no
+// matching entry here. Every lookup site (updateTeamScores, renderChart,
+// updateLobbyList) already guards with `tailwindColors[theme.color]?.bg
+// || 'bg-indigo-500'`, so this never crashed — but it meant any team
+// randomly assigned 'indigo', 'emerald', or 'rose' silently fell back to
+// the exact same generic indigo color as every other team missing an
+// entry, making those three outcomes indistinguishable from each other
+// and inconsistent with the other seven colors in the same random pool.
 export const tailwindColors = {
     red: { text: 'text-red-500', bg: 'bg-red-500', border: 'border-red-500', light: 'text-red-400', heavy: 'bg-red-900' },
     blue: { text: 'text-blue-500', bg: 'bg-blue-500', border: 'border-blue-500', light: 'text-blue-400', heavy: 'bg-blue-900' },
@@ -91,7 +115,10 @@ export const tailwindColors = {
     orange: { text: 'text-orange-500', bg: 'bg-orange-500', border: 'border-orange-500', light: 'text-orange-400', heavy: 'bg-orange-900' },
     slate: { text: 'text-slate-500', bg: 'bg-slate-500', border: 'border-slate-500', light: 'text-slate-400', heavy: 'bg-slate-900' },
     cyan: { text: 'text-cyan-500', bg: 'bg-cyan-500', border: 'border-cyan-500', light: 'text-cyan-400', heavy: 'bg-cyan-900' },
-    amber: { text: 'text-amber-500', bg: 'bg-amber-500', border: 'border-amber-500', light: 'text-amber-400', heavy: 'bg-amber-900' }
+    amber: { text: 'text-amber-500', bg: 'bg-amber-500', border: 'border-amber-500', light: 'text-amber-400', heavy: 'bg-amber-900' },
+    indigo: { text: 'text-indigo-500', bg: 'bg-indigo-500', border: 'border-indigo-500', light: 'text-indigo-400', heavy: 'bg-indigo-900' },
+    emerald: { text: 'text-emerald-500', bg: 'bg-emerald-500', border: 'border-emerald-500', light: 'text-emerald-400', heavy: 'bg-emerald-900' },
+    rose: { text: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-500', light: 'text-rose-400', heavy: 'bg-rose-900' }
 };
 
 export const animalThemes = {

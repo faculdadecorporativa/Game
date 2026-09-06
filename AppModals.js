@@ -1,9 +1,42 @@
 // AppModals.js
 // 🏗️ Web Component for all application overlay Modals (Optimized Depth & UX)
-
+//
+// 🔥 FIX: the "Continue with Google" button below called
+// `window.authUI.handleGoogleLogin()` — a method that doesn't exist
+// anywhere in authController.js or auth.js (both fully reviewed in
+// earlier batches). Every click would throw `TypeError:
+// window.authUI.handleGoogleLogin is not a function`. Rewired to degrade
+// gracefully (a toast explaining it's not available yet) instead of
+// crashing, and written so it self-heals automatically the moment a real
+// `handleGoogleLogin` is added to authUI — no template change needed at
+// that point. PocketBase does support Google OAuth natively
+// (`pb.collection('users').authWithOAuth2(...)`) if you want to wire this
+// up for real; that would need a corresponding method added to authUI in
+// authController.js plus a Google provider configured in your PocketBase
+// admin settings, neither of which is visible from this file alone.
+//
+// 🔥 CONFIRMED (not a new bug, but worth updating your notes): the
+// `#modal-recovery` markup below is a static "ask your professor"
+// message with no input fields and no "send code" action — confirming
+// that `authManager.sendRecoveryCode()` in auth.js isn't just "not wired
+// up yet" as flagged in an earlier batch, but has no UI that could ever
+// call it. Safe to delete from auth.js whenever that file comes back
+// around, rather than leaving it as a maybe-someday hook.
 export class AppModals extends HTMLElement {
 
     connectedCallback() {
+        // 🔥 FIX: same idempotent-render issue fixed in StudentLobby.js,
+        // ProfDashboard.js, and RoleSelection.js (this is now the fourth
+        // occurrence of the identical pattern — a strong signal a shared
+        // base class is overdue). Arguably the most consequential place
+        // for it: this component holds every global modal (auth forms,
+        // recovery, lifelines), and a stray reconnect wiping `innerHTML`
+        // mid-interaction would silently discard whatever a student or
+        // professor was actively typing, or desync the lifeline modal's
+        // live countdown from the DOM node LifelineController.js is still
+        // ticking against.
+        if (this._rendered) return;
+        this._rendered = true;
         this.render();
     }
 
@@ -122,7 +155,7 @@ export class AppModals extends HTMLElement {
 
                     <button 
                         type="button" 
-                        onclick="window.authUI.handleGoogleLogin()" 
+                        onclick="(window.authUI && typeof window.authUI.handleGoogleLogin === 'function') ? window.authUI.handleGoogleLogin() : (window.toast && window.toast('Google sign-in isn\'t available yet — please use phone login.', false))" 
                         class="w-full py-2.5 px-4 mb-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-semibold rounded-xl border border-slate-300 dark:border-slate-600 transition-all duration-200 flex items-center justify-center gap-3 shadow-sm active:scale-95 cursor-pointer"
                     >
                         <svg class="w-5 h-5" viewBox="0 0 24 24">
@@ -167,4 +200,8 @@ export class AppModals extends HTMLElement {
     }
 }
 
-customElements.define('app-modals', AppModals);
+// 🔥 FIX: same Vite-HMR redefinition crash risk fixed in the other
+// custom-element files this batch series has covered.
+if (!customElements.get('app-modals')) {
+    customElements.define('app-modals', AppModals);
+}
