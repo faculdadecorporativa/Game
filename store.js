@@ -161,3 +161,14 @@ export const appStore = new Store({
     countryCodes: JSON.parse(localStorage.getItem('countryCodes')) || [ {flag: '🇺🇸', code: '+1'}, {flag: '🇬🇧', code: '+44'}, {flag: '🇧🇷', code: '+55'}, {flag: '🇪🇸', code: '+34'}, {flag: '🇧🇴', code: '+591'} ],
     teams: JSON.parse(localStorage.getItem('gameTeams')) || [{id: 'dragon'}, {id: 'eagle'}]
 });
+
+// ==========================================
+// 📡 NETWORK QUEUE UTILITIES
+// ==========================================
+
+export function createEmptyQueues() {
+    return {
+        outgoing: [],
+        incoming: []
+    };
+}
