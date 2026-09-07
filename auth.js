@@ -2,6 +2,7 @@
 // Multi-Tenant Logic Layer using PocketBase Database Isolation
 
 import { appStore, DEFAULT_AVATAR } from './store.js';
+import { pb } from './pb.js';
 
 // Initialize PocketBase instance and expose globally if needed
 // NOTE: the base URL is hardcoded here. Not a bug, but worth moving to an

@@ -9,6 +9,7 @@
 //     inventory, equipped, streak, maxStreak — same shape as `me` in store.js)
 
 import { appStore, DEFAULT_AVATAR } from './store.js';
+import { pb } from './pb.js';
 
 // PocketBase record objects carry metadata fields (id, collectionId,
 // collectionName, created, updated, expand) that do NOT belong in the
