@@ -8,7 +8,7 @@ import { pb } from './pb.js';
 // NOTE: the base URL is hardcoded here. Not a bug, but worth moving to an
 // env var (import.meta.env.VITE_PB_URL) once you have separate
 // dev/staging/prod PocketBase instances.
-export const pb = window.pb || new window.PocketBase('https://pb.faculdadecorporativa.com.br');
+export { pb };
 window.pb = pb;
 
 const EMAIL_CONFIG = {
