@@ -14,11 +14,15 @@ export class GamifiedShop extends HTMLElement {
                     </div>
                 </div>
                 
-                <div class="flex flex-wrap gap-2 mb-8 shrink-0">
-                    <button id="tab-btn-consumables" onclick="window.shopController.switchTab('consumables')" class="shop-tab-btn flex-1 min-w-[120px]">Boosts</button>
-                    <button id="tab-btn-cosmetics" onclick="window.shopController.switchTab('cosmetics')" class="shop-tab-btn flex-1 min-w-[120px]">Borders</button>
-                    <button id="tab-btn-titles" onclick="window.shopController.switchTab('titles')" class="shop-tab-btn flex-1 min-w-[120px]">Titles</button>
-                    <button id="tab-btn-avatars" onclick="window.shopController.switchTab('avatars')" class="shop-tab-btn flex-1 min-w-[120px]">Avatars</button>
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <button id="tab-btn-consumables" onclick="window.shopController.switchTab('consumables')" class="shop-tab-btn flex-1 min-w-[120px] bg-indigo-600 text-white font-black py-4 px-4 rounded-xl">Boosts</button>
+                    <button id="tab-btn-cosmetics" onclick="window.shopController.switchTab('cosmetics')" class="shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl">Borders</button>
+                    <button id="tab-btn-titles" onclick="window.shopController.switchTab('titles')" class="shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl">Titles</button>
+                    <button id="tab-btn-avatars_free" onclick="window.shopController.switchTab('avatars_free')" class="shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl">Free Avatars</button>
+                    <button id="tab-btn-avatars_judges" onclick="window.shopController.switchTab('avatars_judges')" class="shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl">Judges</button>
+                    <button id="tab-btn-avatars_apostles" onclick="window.shopController.switchTab('avatars_apostles')" class="shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl">Apostles</button>
+                    <button id="tab-btn-avatars_kings_queens" onclick="window.shopController.switchTab('avatars_kings_queens')" class="shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl">Kings & Queens</button>
+                    <button id="tab-btn-avatars_valiant" onclick="window.shopController.switchTab('avatars_valiant')" class="shop-tab-btn flex-1 min-w-[120px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-4 px-4 rounded-xl">Valiant</button>
                 </div>
 
                 <!-- Scrollable Items Area -->
