@@ -1,6 +1,10 @@
 // GamifiedShop.js
 export class GamifiedShop extends HTMLElement {
     connectedCallback() {
+        // Prevent connectedCallback from wiping inner HTML and ShopController state on DOM re-attaches
+        if (this.hasRendered) return;
+        this.hasRendered = true;
+
         this.innerHTML = `
             <div class="max-w-6xl mx-auto p-4 sm:p-8 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl h-full flex flex-col">
                 <div class="flex justify-between items-center mb-8 shrink-0">
