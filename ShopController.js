@@ -234,11 +234,13 @@ export const shopController = {
         me.inventory = me.inventory || {};
         me.equipped = me.equipped || { title: 'Novice Learner', border: 'border-slate-300' };
 
-        const items = this.catalog[this.currentTab];
+        // Safeguard for unmapped tabs preventing map loop crashes
+        const items = this.catalog[this.currentTab] || [];
 
         let html = '';
 
-        items.forEach(item => {
+        // Safeguarded array loop
+        (items || []).forEach(item => {
             const isConsumable = this.currentTab === 'consumables';
             const hasPurchased = me.inventory[item.id] > 0 || me.inventory[item.id] === true;
             
